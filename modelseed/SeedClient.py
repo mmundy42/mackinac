@@ -5,6 +5,7 @@ import json
 from os import environ, path
 from getpass import getpass
 import base64
+import six
 
 
 def get_token(username, password=None, token_type='patric', timeout=5):
@@ -50,7 +51,8 @@ def get_token(username, password=None, token_type='patric', timeout=5):
         url = 'http://rast.nmpdr.org/goauth/token?grant_type=client_credentials&client_id={0}'.format(username)
         headers = dict()
         headers['Content-Type'] = 'application/json'
-        headers['Authorization'] = 'Basic ' + base64.encodestring(username + ':' + password)[:-1]
+        headers['Authorization'] = 'Basic {0}'\
+            .format(base64.urlsafe_b64encode(six.b(username + ':' + password)).decode("ascii"))
         response = requests.get(url, headers=headers, timeout=timeout)
         if response.status_code != requests.codes.OK:
             response.raise_for_status()

@@ -4,3 +4,4 @@ from .modelseed import delete_modelseed_model, gapfill_modelseed_model, get_mode
     create_universal_model, optimize_modelseed_model, reconstruct_modelseed_model
 from .workspace import get_workspace_object_data, get_workspace_object_meta, list_workspace_objects
 from .genome import get_genome_summary, get_genome_features
+from .SeedClient import get_token
