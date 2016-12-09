@@ -2,8 +2,8 @@
 """Get version identification from git
 
 See the documentation of get_version for more information
-
 """
+
 from __future__ import print_function
 
 from subprocess import check_output, CalledProcessError
@@ -55,7 +55,7 @@ if name == "nt":
 
 
 def call_git_describe(abbrev=7):
-    """return the string output of git desribe"""
+    """ Return the string output of 'git desribe' command. """
     try:
         with open(devnull, "w") as fnull:
             arguments = [GIT_COMMAND, "describe", "--tags",
@@ -67,7 +67,7 @@ def call_git_describe(abbrev=7):
 
 
 def format_git_describe(git_str, pep440=False):
-    """format the result of calling 'git describe' as a python version"""
+    """ Format the result of calling 'git describe' as a python version. """
     if git_str is None:
         return None
     if "-" not in git_str:  # currently at a tag
@@ -83,9 +83,9 @@ def format_git_describe(git_str, pep440=False):
 
 
 def read_release_version():
-    """Read version information from VERSION file"""
+    """ Read version information from the VERSION file. """
     try:
-        with open(VERSION_FILE, "r") as infile:
+        with open(VERSION_FILE, 'r') as infile:
             version = str(infile.read().strip())
         if len(version) == 0:
             version = None
@@ -95,15 +95,15 @@ def read_release_version():
 
 
 def update_release_version():
-    """Update VERSION file"""
+    """ Update version information in the VERSION file. """
     version = get_version(pep440=True)
-    with open(VERSION_FILE, "w") as outfile:
+    with open(VERSION_FILE, 'w') as outfile:
         outfile.write(version)
         outfile.write("\n")
 
 
 def get_version(pep440=False):
-    """Tracks the version number.
+    """ Get the current version number.
 
     pep440: bool
         When True, this function returns a version string suitable for
@@ -118,9 +118,8 @@ def get_version(pep440=False):
     However, if the script is located within an active git repository,
     git-describe is used to get the version information.
 
-    The file VERSION will need to be changed by manually. This should be done
+    The file VERSION needs to be changed by manually. This should be done
     before running git tag (set to the same as the version in the tag).
-
     """
 
     git_version = format_git_describe(call_git_describe(), pep440=pep440)
