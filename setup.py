@@ -14,14 +14,14 @@ except ImportError:
     from setuptools import setup, find_packages
 
 # Import version to get the version string
-path.insert(0, join(SETUP_DIR, "modelseed"))
+path.insert(0, join(SETUP_DIR, 'modelseed'))
 from version import get_version, update_release_version
 path.pop(0)
 version = get_version(pep440=True)
 
 # If building something for distribution, ensure the VERSION
 # file is up to date
-if "sdist" in argv or "bdist_wheel" in argv:
+if 'sdist' in argv or 'bdist_wheel' in argv:
     update_release_version()
 
 # Begin constructing arguments for building package.
@@ -30,25 +30,25 @@ setup_kwargs = {}
 try:
     with open('README.rst') as handle:
         readme = handle.read()
-    setup_kwargs["long_description"] = readme
+    setup_kwargs['long_description'] = readme
 except:
-    setup_kwargs["long_description"] = ''
+    setup_kwargs['long_description'] = ''
 
 setup(
-    name="modelseed",
+    name='modelseed',
     version=version,
     packages=find_packages(),
     setup_requires=[],
-    install_requires=["cobra >= 0.5.6", "six", "requests"],
-    tests_require=["pytest"],
+    install_requires=['cobra >= 0.5.6', 'six', 'requests'],
+    tests_require=['pytest'],
     package_data={},
-    author="Michael Mundy <mundy.michael@mayo.edu",
-    author_email="mundy.michael@mayo.edu",
-    description="ModelSEED support for COBRApy",
-    license="BSD",
-    keywords="metabolism biology optimization flux balance analysis fba",
-#    url="https://opencobra.github.io/cobrapy",
-    test_suite="cobra.test.suite",
+    author='Michael Mundy <mundy.michael@mayo.edu',
+    author_email='mundy.michael@mayo.edu',
+    description='ModelSEED support for cobrapy',
+    license='BSD',
+    keywords='metabolism biology optimization flux balance analysis fba',
+#    url='https://opencobra.github.io/cobrapy',
+    test_suite='cobra.test.suite',
     download_url='https://pypi.python.org/pypi/cobrapy-modelseed',
     classifiers=[
         'Development Status :: 4 - Beta',
@@ -62,5 +62,5 @@ setup(
         'Topic :: Scientific/Engineering',
         'Topic :: Scientific/Engineering :: Bio-Informatics'
     ],
-    platforms="GNU/Linux, Mac OS X >= 10.7, Microsoft Windows >= 7",
+    platforms='GNU/Linux, Mac OS X >= 10.7, Microsoft Windows >= 7',
     **setup_kwargs)
