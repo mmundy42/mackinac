@@ -3,10 +3,9 @@ ModelSEED for cobrapy
 
 ModelSEED for `cobrapy <https://github.com/opencobra/cobrapy>`_ provides
 support for creating COBRA models from ModelSEED models and using the ModelSEED
-web service. The ModelSEED web service creates draft models from genomes
-available in the `Pathosystems Resource Integration Center
-<https://www.patricbrc.org/portal/portal/patric/Home>`_ (PATRIC).
-If you are not a `registered PATRIC user
+web service to create draft models from genomes available in the `Pathosystems
+Resource Integration Center <https://www.patricbrc.org/portal/portal/patric/Home>`_
+(PATRIC). If you are not a `registered PATRIC user
 <http://enews.patricbrc.org/faqs/workspace-faqs/registration-faqs/>`_,
 you must complete a `new user registration <https://user.patricbrc.org/register/>`_
 to work with the ModelSEED web service.
@@ -18,7 +17,7 @@ inspecting, and drawing conclusions from the model.
 
 You can also reconstruct and gap fill models using the ModelSEED
 service for any organism with a genome available in PATRIC. In addition,
-there are functions to help manage and view ModelSEED models.
+there are functions to manage and work with ModelSEED models.
 
 The documentation is browseable online at
 `readthedocs <https://cobrapy-modelseed.readthedocs.org/en/stable/>`_
@@ -37,11 +36,11 @@ More information about opencobra is available at the
 Installation
 ^^^^^^^^^^^^
 
-What about cobrapy - gotta have it.
-
-Use pip to install modelseed from
+Use pip to install ModelSEED for cobrapy from
 `PyPI <https://pypi.python.org/pypi/modelseed>`_ (we recommend doing this
-inside a `virtual
-environment <http://docs.python-guide.org/en/latest/dev/virtualenvs/>`_)::
+inside a `virtual environment
+<http://docs.python-guide.org/en/latest/dev/virtualenvs/>`_)::
 
     pip install modelseed
+
+ModelSEED for cobrapy requires the cobrapy, requests, and six packages.
