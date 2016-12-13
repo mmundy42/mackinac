@@ -1,7 +1,6 @@
-ModelSEED for cobrapy is licensed under the following BSD 3-clause license:
-
 Copyright (c) 2016, Mayo Foundation for Medical Education and Research
 All rights reserved.
+
 Redistribution and noncommercial use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
     * Redistributions of source code must retain the above copyright
@@ -12,6 +11,14 @@ modification, are permitted provided that the following conditions are met:
     * Neither the name of the Mayo Clinic nor the names of its contributors
       may be used to endorse or promote products derived from this software
       without specific prior written permission.
+    * Unless required by applicable law or agreed to in writing, Licensor
+      provides the Work (and each Contributor provides its Contributions) on
+      an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+      express or implied, including, without limitation, any warranties or
+      conditions of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
+      PARTICULAR PURPOSE. You are solely responsible for determining the
+      appropriateness of using or redistributing the Work and assume any risks
+      associated with Your exercise of permissions under this License.
 
 For a license for commercial use, please contact Mayo Clinic Ventures at
 mayoclinicventures@mayo.edu.
