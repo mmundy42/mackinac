@@ -49,7 +49,7 @@ setup(
     keywords='metabolism biology optimization flux balance analysis fba',
 #    url='https://opencobra.github.io/cobrapy',
     test_suite='cobra.test.suite',
-    download_url='https://pypi.python.org/pypi/cobrapy-modelseed',
+    download_url='https://pypi.python.org/pypi/modelseed',
     classifiers=[
         'Development Status :: 4 - Beta',
         'Environment :: Console',
