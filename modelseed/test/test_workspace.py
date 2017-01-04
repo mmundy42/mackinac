@@ -5,11 +5,26 @@ import modelseed
 
 @pytest.mark.usefixtures('authenticate')
 @pytest.fixture(scope='module')
-def test_model(b_theta_id):
+def test_model(b_theta_genome_id, b_theta_id):
     # Reconstruct a model so there is a folder in the workspace.
-    stats = modelseed.reconstruct_modelseed_model(b_theta_id)
+    stats = modelseed.reconstruct_modelseed_model(b_theta_genome_id, model_id=b_theta_id)
     yield stats
     modelseed.delete_modelseed_model(b_theta_id)
+
+
+@pytest.fixture(scope='module')
+def test_file():
+    return '/{0}/modelseed/emergency'.format(modelseed.workspace.ws_client.username)
+
+
+@pytest.fixture(scope='module')
+def test_file_data():
+    return 'This is a test of the emergency broadcasting system.'
+
+
+@pytest.fixture(scope='module')
+def bad_reference():
+    return '/{0}/modelseed/badref'.format(modelseed.workspace.ws_client.username)
 
 
 class TestWorkspace:
@@ -72,7 +87,36 @@ class TestWorkspace:
         output = modelseed.get_workspace_object_data(reference, json_data=False)
         assert len(output) > 100000  # Just a really long string
 
-    def test_get_object_data_bad_ref(self):
-        bad_reference = '{0}/modelseed/badref'.format(modelseed.workspace.ws_client.username)
+    def test_get_object_data_bad_ref(self, bad_reference):
         with pytest.raises(modelseed.SeedClient.ObjectNotFoundError):
             modelseed.get_workspace_object_data(bad_reference)
+
+    def test_put_object_no_data(self, test_file):
+        output = modelseed.put_workspace_object(test_file, 'string')
+        assert output[0] == 'emergency'
+        assert output[1] == 'string'
+        assert output[6] == 0
+        assert len(output[7]) == 0
+
+    def test_put_object_meta(self, test_file, b_theta_id):
+        output = modelseed.put_workspace_object(test_file, 'string', metadata={'model': b_theta_id}, overwrite=True)
+        assert output[0] == 'emergency'
+        assert output[1] == 'string'
+        assert output[6] == 0
+        assert len(output[7]) == 1
+
+    def test_put_object_data(self, test_file, test_file_data, b_theta_id):
+        output = modelseed.put_workspace_object(test_file, 'string', data=test_file_data,
+                                                metadata={'model': b_theta_id}, overwrite=True)
+        assert output[0] == 'emergency'
+        assert output[1] == 'string'
+        assert output[6] == len(test_file_data)
+        assert len(output[7]) == 1
+
+    def test_delete_object(self, test_file):
+        output = modelseed.delete_workspace_object(test_file)
+        assert output[0] == 'emergency'
+
+    def test_delete_object_bad_ref(self, bad_reference):
+        with pytest.raises(modelseed.SeedClient.ObjectNotFoundError):
+            modelseed.delete_workspace_object(bad_reference)

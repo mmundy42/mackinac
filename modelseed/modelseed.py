@@ -8,7 +8,7 @@ import re
 from cobra import Model, Reaction, Metabolite, Gene
 
 from .SeedClient import SeedClient, ServerError, ObjectNotFoundError, JobError, handle_server_error
-from .workspace import get_workspace_object_meta, get_workspace_object_data
+from .workspace import get_workspace_object_meta, get_workspace_object_data, put_workspace_object
 
 # ModelSEED service endpoint
 modelseed_url = 'https://p3.theseed.org/services/ProbModelSEED'
@@ -863,16 +863,13 @@ def reconstruct_modelseed_model(genome_id, source='patric', template_reference=N
     # Workaround for ModelSEED workspace bug. The user's modelseed folder must exist before saving
     # the model. Otherwise the type of the folder created for the model is not "modelfolder" and
     # subsequent operations on the model will fail.
-    # try:
-    #     if ws_client.username is None:
-    #         ws_client.set_authentication_token()
-    #     reference = '/{0}'.format(ws_client.username)
-    #     output = ws_client.call('ls', {'paths': [reference]})
-    #     if model_folder not in output:
-    #         reference = join(reference, model_folder)
-    #         ws_client.call('create', {'objects': [[reference, 'folder']]})
-    # except ServerError as e:
-    #     handle_server_error(e, [reference])
+    if ms_client.username is None:
+        ms_client.set_authentication_token()
+    folder_reference = '/{0}/{1}'.format(ms_client.username, model_folder)
+    try:
+        get_workspace_object_meta(folder_reference)
+    except ObjectNotFoundError:
+        put_workspace_object(folder_reference, 'folder')
 
     # Run the server method.
     try:

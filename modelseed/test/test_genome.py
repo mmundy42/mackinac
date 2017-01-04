@@ -5,9 +5,9 @@ import modelseed
 
 class TestGenomeBacteroidesThetaiotaomicron:
 
-    def test_get_summary(self, b_theta_id, b_theta_name):
-        summary = modelseed.get_genome_summary(b_theta_id)
-        assert summary['genome_id'] == b_theta_id
+    def test_get_summary(self, b_theta_genome_id, b_theta_name):
+        summary = modelseed.get_genome_summary(b_theta_genome_id)
+        assert summary['genome_id'] == b_theta_genome_id
         assert summary['organism_name'] == b_theta_name
         assert summary['cell_shape'] == 'Rod'
         assert summary['gram_stain'] == '-'
@@ -18,26 +18,26 @@ class TestGenomeBacteroidesThetaiotaomicron:
         with pytest.raises(ValueError):
             modelseed.get_genome_summary('900.900')
 
-    def test_get_features_patric(self, b_theta_id):
-        features = modelseed.get_genome_features(b_theta_id)
+    def test_get_features_patric(self, b_theta_genome_id):
+        features = modelseed.get_genome_features(b_theta_genome_id)
         assert len(features) == 4965
         assert 'na_length' in features[0]
         assert 'na_sequence' in features[0]
         assert 'feature_type' in features[0]
-        assert features[0]['patric_id'].startswith('fig|{0}'.format(b_theta_id))
+        assert features[0]['patric_id'].startswith('fig|{0}'.format(b_theta_genome_id))
 
-    def test_get_features_refseq(self, b_theta_id):
-        features = modelseed.get_genome_features(b_theta_id, annotation='RefSeq')
+    def test_get_features_refseq(self, b_theta_genome_id):
+        features = modelseed.get_genome_features(b_theta_genome_id, annotation='RefSeq')
         assert len(features) == 4902
         assert 'na_length' in features[0]
         assert 'na_sequence' in features[0]
         assert 'feature_type' in features[0]
-        assert features[0]['feature_id'].startswith('RefSeq.{0}'.format(b_theta_id))
+        assert features[0]['feature_id'].startswith('RefSeq.{0}'.format(b_theta_genome_id))
 
     def test_get_features_bad_id(self):
         with pytest.raises(ValueError):
             modelseed.get_genome_features('900.900')
 
-    def test_get_features_bad_annotation(self, b_theta_id):
+    def test_get_features_bad_annotation(self, b_theta_genome_id):
         with pytest.raises(ValueError):
-            modelseed.get_genome_features(b_theta_id, annotation='foobar')
+            modelseed.get_genome_features(b_theta_genome_id, annotation='foobar')

@@ -9,8 +9,8 @@ class TestModelseedBacteroidesThetaiotaomicron:
     # Remember these tests are calling a server and can take a while depending on the network
     # and how busy the server is servicing other requests.
 
-    def test_reconstruct(self, b_theta_id, b_theta_name):
-        stats = modelseed.reconstruct_modelseed_model(b_theta_id)
+    def test_reconstruct(self, b_theta_genome_id, b_theta_id, b_theta_name):
+        stats = modelseed.reconstruct_modelseed_model(b_theta_genome_id, model_id=b_theta_id)
         assert stats['id'] == b_theta_id
         assert stats['name'] == b_theta_name
         assert stats['num_compartments'] == 2
@@ -68,10 +68,14 @@ class TestModelseedBacteroidesThetaiotaomicron:
 
     def test_list_models(self, b_theta_id, b_theta_name):
         output = modelseed.list_modelseed_models()
-        assert len(output) == 1
-        assert output[0]['id'] == b_theta_id
-        assert output[0]['name'] == b_theta_name
-        assert output[0]['ref'] == '/{0}/modelseed/{1}'.format(modelseed.modelseed.ms_client.username, b_theta_id)
+        assert len(output) > 1
+        found = False
+        for meta in output:
+            if meta['id'] == b_theta_id:
+                found = True
+            assert output[0]['name'] == b_theta_name
+            assert output[0]['ref'] == '/{0}/modelseed/{1}'.format(modelseed.modelseed.ms_client.username, b_theta_id)
+        assert found == True
 
     def test_create_cobra_model(self, b_theta_id, b_theta_name):
         model = modelseed.create_cobra_model_from_modelseed_model(b_theta_id)

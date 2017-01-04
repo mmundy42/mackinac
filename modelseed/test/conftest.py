@@ -21,9 +21,14 @@ def authenticate():
 
 
 @pytest.fixture(scope='session')
-def b_theta_id():
+def b_theta_genome_id():
     # PATRIC genome ID for Bacteroides thetaiotaomicron VPI-5482
     return '226186.12'
+
+
+@pytest.fixture(scope='session')
+def b_theta_id():
+    return '226186.12-pytest'
 
 
 @pytest.fixture(scope='session')
