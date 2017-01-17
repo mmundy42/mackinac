@@ -852,7 +852,7 @@ def reconstruct_modelseed_model(genome_id, source='patric', template_reference=N
         model_id = genome_id
     params['output_file'] = model_id
     if template_reference is not None:
-        params['templatemodel'] = template_reference
+        params['template_model'] = template_reference
     if likelihood:
         params['probanno'] = 1
     else:
