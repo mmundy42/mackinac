@@ -3,7 +3,6 @@ import pytest
 import modelseed
 
 
-@pytest.mark.usefixtures('authenticate')
 @pytest.fixture(scope='module')
 def test_model(b_theta_genome_id, b_theta_id):
     # Reconstruct a model so there is a folder in the workspace.
@@ -27,6 +26,7 @@ def bad_reference():
     return '/{0}/modelseed/badref'.format(modelseed.workspace.ws_client.username)
 
 
+@pytest.mark.usefixtures('authenticate')
 class TestWorkspace:
 
     # Remember these tests are calling a server and can take a while depending on the network

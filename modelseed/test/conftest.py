@@ -9,14 +9,12 @@ def authenticate():
     # Get a token for authenticating to the services.
     try:
         username = os.environ['TEST_USERNAME']
-    except KeyError as e:
-        print('You must set TEST_USERNAME environment variable to run this test')
-        raise e
+    except KeyError:
+        raise KeyError('You must set TEST_USERNAME environment variable to run this test')
     try:
         password = os.environ['TEST_PASSWORD']
-    except KeyError as e:
-        print('You must set TEST_PASSWORD environment variable to run this test')
-        raise e
+    except KeyError:
+        raise KeyError('You must set TEST_PASSWORD environment variable to run this test')
     modelseed.get_token(username, password=password)
 
 
