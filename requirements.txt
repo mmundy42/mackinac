@@ -1,0 +1,8 @@
+numpy>=1.12.0
+scipy>=0.18.0
+six>=1.9.0
+python-libsbml
+lxml
+cobra>=0.5.6
+requests
+configparser

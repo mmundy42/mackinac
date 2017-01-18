@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 import requests
-import configparser  # @todo Should check for this in __init__?
+import configparser
 import json
 from os import environ, path
 from getpass import getpass

@@ -43,4 +43,53 @@ inside a `virtual environment
 
     pip install modelseed
 
-ModelSEED for cobrapy requires the cobrapy, requests, and six packages.
+ModelSEED for cobrapy requires the cobrapy, requests, configparser, and six packages.
+
+Direct installation in virtual environment
+------------------------------------------
+
+1. If virtualenvwrapper is not installed, `follow the directions <https://virtualenvwrapper.readthedocs.io/en/latest/>`__
+   to install virtualenvwrapper.
+
+2. Clone the `git repository <https://github.com/mmundy42/modelseed-cobrapy>`_ to your computer.
+
+2. Create a virtualenv for modelseed with these commands::
+
+    $ cd modelseed-cobrapy
+    $ mkvirtualenv --python /Library/Frameworks/Python.framework/Versions/2.7/bin/python modelseed-py27
+
+   Use the ``--python`` option to select a specific version of Python for the virtualenv. For example,
+   ``python=python3`` to select the latest python3 installed on the system.
+
+   Note on macOS, matplotlib requires Python be installed as a framework but virtualenv creates a
+   non-framework build of Python. See the `matplotlib FAQ <http://matplotlib.org/1.5.3/faq/virtualenv_faq.html>`__
+   for details on a workaround.
+
+3. Upgrade pip and setuptools to the latest versions with these commands::
+
+    (modelseed-py27)$ pip install --upgrade pip setuptools
+
+4. Install all of the modelseed dependencies with this command::
+
+    (modelseed-py27) pip install -r requirements.txt
+
+   This command takes a few minutes while numpy, pandas, and libsbml are built in the virtualenv.
+
+5. Install the latest version of modelseed with this command::
+
+    (modelseed-py27)$ python setup.py install
+
+
+Run tests to verify installation
+--------------------------------
+
+You need to provide a username and password for the tests to obtain an authentication
+token.
+
+1. Install the pytest package with this command::
+
+    (modelseed-py27)$ pip install pytest
+
+2. Substitute your PATRIC username and password and run the tests with this command::
+
+    (modelseed-py27)$ TEST_USERNAME=<username> TEST_PASSWORD=<password> pytest modelseed/tests
