@@ -45,7 +45,8 @@ class TestWorkspace:
     def test_list_objects_by_type(self, test_model):
         output = modelseed.list_workspace_objects(test_model['ref'], sort_key='type')
         assert len(output) == 8
-        assert output[0][0] == 'fba'
+        assert output[2][1] == 'genome'
+        assert output[4][1] == 'model'
 
     def test_list_objects_bad_folder(self):
         # This fails because there is no leading forward slash.
