@@ -92,4 +92,31 @@ token.
 
 2. Substitute your PATRIC username and password and run the tests with this command::
 
-    (modelseed-py27)$ TEST_USERNAME=<username> TEST_PASSWORD=<password> pytest modelseed/tests
+    (modelseed-py27)$ TEST_USERNAME=<username> TEST_PASSWORD=<password> pytest modelseed/test
+
+Run examples in a notebook
+--------------------------
+
+An example of how to use ModelSEED for cobrapy is provided in a notebook. Here's how to start Jupyter and run
+the notebook from the virtualenv.
+
+1. Install Jupyter with this command::
+
+    (modelseed-py27)$ pip install jupyter
+
+2. Install a kernel that uses the virtualenv installation with this command::
+
+    (modelseed-py27)$ ipython kernel install --name "modelseed Python 27" --user
+
+3. Start the Jupyter notebook server with this command::
+
+    (modelseed-py27)$ juypter notebook
+
+   Jupyter opens a web page in your default browser with a file browser.
+
+4. Navigate to the "documentation_builder" folder and click on the "modelseed.ipynb" notebook.
+
+5. After the notebook opens, from the "Kernel" menu, select "Change kernel" and click on "modelseed Python 27".
+
+6. Now you can run the cells in the notebook.
+
