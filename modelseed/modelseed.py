@@ -791,6 +791,9 @@ def optimize_modelseed_model(model_id, media_reference=None):
         Objective value
     """
 
+    # Get the model statistics (only way to tell if this optimization is successful).
+    stats = get_modelseed_model_stats(model_id)
+
     # Set input parameters for method.
     reference = _make_modelseed_reference(model_id)
     params = dict()
@@ -813,6 +816,9 @@ def optimize_modelseed_model(model_id, media_reference=None):
     # was just created so get the list of solutions. Last completed
     # solution is first in the list.
     solutions = get_modelseed_fba_solutions(model_id)
+    if stats['fba_count'] == len(solutions):
+        warn('Optimization for {0} did not return a solution'.format(model_id))
+        return None
     return float(solutions[0]['objective'])
 
 
