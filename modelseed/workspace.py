@@ -55,7 +55,7 @@ def shock_download(url, token):
         Data from Shock node
     """
 
-    response = requests.get(url + '?download', headers={'AUTHORIZATION': 'OAuth ' + token})
+    response = requests.get(url + '?download', headers={'Authorization': 'OAuth ' + token})
     if response.status_code != requests.codes.OK:
         response.raise_for_status()
     return response.text
@@ -198,7 +198,7 @@ def put_workspace_object(reference, object_type, data=None, metadata=None, shock
     metadata : dict, optional
         User metadata for object
     shock : bool, optional
-        When True, store data for object in Shock
+        When True, store data for object in Shock (not supported yet)
     overwrite : bool, optional
         When True, overwrite the contents of an existing object
 
@@ -208,11 +208,13 @@ def put_workspace_object(reference, object_type, data=None, metadata=None, shock
         Object metadata
     """
 
+    if shock:
+        raise ValueError('Storing data in Shock is not supported yet')
     params = dict()
     params['objects'] = [[reference, object_type]]
     if metadata is not None:
         params['objects'][0].append(metadata)
-    if data is not None:
+    if data is not None and shock is False:
         if metadata is None:
             params['objects'][0].append(dict())
         params['objects'][0].append(data)
