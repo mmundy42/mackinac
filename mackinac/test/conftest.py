@@ -1,7 +1,7 @@
 import pytest
 import os
 
-import modelseed
+import mackinac
 
 
 @pytest.fixture(scope='session')
@@ -15,7 +15,7 @@ def authenticate():
         password = os.environ['TEST_PASSWORD']
     except KeyError:
         raise KeyError('You must set TEST_PASSWORD environment variable to run this test')
-    modelseed.get_token(username, password=password)
+    mackinac.get_token(username, password=password)
 
 
 @pytest.fixture(scope='session')

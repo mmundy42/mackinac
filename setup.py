@@ -6,7 +6,7 @@ from setuptools import setup, find_packages
 SETUP_DIR = abspath(dirname(__file__))
 
 # Import version to get the version string
-path.insert(0, join(SETUP_DIR, 'modelseed'))
+path.insert(0, join(SETUP_DIR, 'mackinac'))
 from version import get_version, update_release_version
 path.pop(0)
 version = get_version(pep440=True)
@@ -23,7 +23,7 @@ except:
     description = ''
 
 setup(
-    name='modelseed',
+    name='mackinac',
     version=version,
     packages=find_packages(),
     setup_requires=[],
@@ -32,12 +32,12 @@ setup(
     package_data={},
     author='Michael Mundy, Helena Mendes-Soares, Nicholas Chia',
     author_email='mundy.michael@mayo.edu',
-    description='ModelSEED support for cobrapy',
+    description='Mackinac: A bridge between ModelSEED and COBRApy',
     long_description=description,
     license='BSD',
     keywords='metabolism biology optimization flux balance analysis fba',
-#    url='https://opencobra.github.io/cobrapy',
-    download_url='https://pypi.python.org/pypi/modelseed',
+    url='https://github.com/mmundy42/mackinac',
+    download_url='https://pypi.python.org/pypi/mackinac',
     classifiers=[
         'Development Status :: 4 - Beta',
         'Environment :: Console',

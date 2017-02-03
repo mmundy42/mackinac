@@ -1,28 +1,26 @@
-ModelSEED for cobrapy
-=====================
+Mackinac: A bridge between ModelSEED and COBRApy
+================================================
 
-ModelSEED for `cobrapy <https://github.com/opencobra/cobrapy>`_ provides
-support for creating COBRA models from ModelSEED models and using the ModelSEED
-web service to create draft models from genomes available in the `Pathosystems
-Resource Integration Center <https://www.patricbrc.org/portal/portal/patric/Home>`_
-(PATRIC). If you are not a `registered PATRIC user
-<http://enews.patricbrc.org/faqs/workspace-faqs/registration-faqs/>`_,
+Mackinac combines the ability of `ModelSEED <http://modelseed.org>`_ to automatically
+reconstruct metabolic models with the advanced analysis capabilities in
+`cobrapy <https://github.com/opencobra/cobrapy>`_ to bridge the differences between
+the two frameworks. Mackinac provides support for using the ModelSEED
+web service to create draft genome-scale models from genomes available in the
+`Pathosystems Resource Integration Center <https://www.patricbrc.org/portal/portal/patric/Home>`_
+(PATRIC) and creates a COBRA model from a ModelSEED model. If you are not a
+`registered PATRIC user <http://enews.patricbrc.org/faqs/workspace-faqs/registration-faqs/>`_,
 you must complete a `new user registration <https://user.patricbrc.org/register/>`_
 to work with the ModelSEED web service.
  
 If you already have models available in ModelSEED, you can simply import and
 create a COBRA model with the ``create_cobra_model_from_modelseed_model()``
-function. You can then use all of the features in cobrapy for analyzing,
-inspecting, and drawing conclusions from the model.
+function. You can then use all of the features in cobrapy to analyze,
+inspect, explore, and draw conclusions from the model.
 
 You can also reconstruct and gap fill models using the ModelSEED
-service for any organism with a genome available in PATRIC. In addition,
-there are functions to manage and work with ModelSEED models.
-
-The documentation is browseable online at
-`readthedocs <https://cobrapy-modelseed.readthedocs.org/en/stable/>`_
-and can also be
-`downloaded <https://readthedocs.org/projects/cobrapy-modelseed/downloads/>`_.
+service for any organism with a genome available in PATRIC. Additional functions
+are available for working with ModelSEED models, managing workspace objects,
+getting information about PATRIC genomes, and calculating reaction likelihoods.
 
 Please use the `cobrapy Google
 Group <http://groups.google.com/group/cobra-pie>`_ for help.
@@ -36,14 +34,14 @@ More information about opencobra is available at the
 Installation
 ^^^^^^^^^^^^
 
-Use pip to install ModelSEED for cobrapy from
-`PyPI <https://pypi.python.org/pypi/modelseed>`_ (we recommend doing this
+Use pip to install Mackinac from
+`PyPI <https://pypi.python.org/pypi/mackinac>`_ (we recommend doing this
 inside a `virtual environment
 <http://docs.python-guide.org/en/latest/dev/virtualenvs/>`_)::
 
-    pip install modelseed
+    pip install mackinac
 
-ModelSEED for cobrapy requires the cobrapy, requests, configparser, and six packages.
+Mackinac requires the cobrapy, requests, configparser, and six packages.
 
 Direct installation in virtual environment
 ------------------------------------------
@@ -51,12 +49,12 @@ Direct installation in virtual environment
 1. If virtualenvwrapper is not installed, `follow the directions <https://virtualenvwrapper.readthedocs.io/en/latest/>`__
    to install virtualenvwrapper.
 
-2. Clone the `git repository <https://github.com/mmundy42/modelseed-cobrapy>`_ to your computer.
+2. Clone the `git repository <https://github.com/mmundy42/mackinac>`_ to your computer.
 
-2. Create a virtualenv for modelseed with these commands::
+2. Create a virtualenv for Mackinac with these commands::
 
-    $ cd modelseed-cobrapy
-    $ mkvirtualenv --python /Library/Frameworks/Python.framework/Versions/2.7/bin/python modelseed-py27
+    $ cd mackinac
+    $ mkvirtualenv --python /Library/Frameworks/Python.framework/Versions/2.7/bin/python mackinac-py27
 
    Use the ``--python`` option to select a specific version of Python for the virtualenv. For example,
    ``python=python3`` to select the latest python3 installed on the system.
@@ -67,17 +65,17 @@ Direct installation in virtual environment
 
 3. Upgrade pip and setuptools to the latest versions with these commands::
 
-    (modelseed-py27)$ pip install --upgrade pip setuptools
+    (mackinac-py27)$ pip install --upgrade pip setuptools
 
-4. Install all of the modelseed dependencies with this command::
+4. Install all of the Mackinac dependencies with this command::
 
-    (modelseed-py27) pip install -r requirements.txt
+    (mackinac-py27) pip install -r requirements.txt
 
    This command takes a few minutes while numpy, pandas, and libsbml are built in the virtualenv.
 
-5. Install the latest version of modelseed with this command::
+5. Install the latest version of Mackinac with this command::
 
-    (modelseed-py27)$ python setup.py install
+    (mackinac-py27)$ python setup.py install
 
 
 Run tests to verify installation
@@ -88,35 +86,34 @@ token.
 
 1. Install the pytest package with this command::
 
-    (modelseed-py27)$ pip install pytest
+    (mackinac-py27)$ pip install pytest
 
 2. Substitute your PATRIC username and password and run the tests with this command::
 
-    (modelseed-py27)$ TEST_USERNAME=<username> TEST_PASSWORD=<password> pytest modelseed/test
+    (mackinac-py27)$ TEST_USERNAME=<username> TEST_PASSWORD=<password> pytest mackinac/test
 
 Run examples in a notebook
 --------------------------
 
-An example of how to use ModelSEED for cobrapy is provided in a notebook. Here's how to start Jupyter and run
+An example of how to use Mackinac is provided in a notebook. Here's how to start Jupyter and run
 the notebook from the virtualenv.
 
 1. Install Jupyter with this command::
 
-    (modelseed-py27)$ pip install jupyter
+    (mackinac-py27)$ pip install jupyter
 
 2. Install a kernel that uses the virtualenv installation with this command::
 
-    (modelseed-py27)$ ipython kernel install --name "modelseed Python 27" --user
+    (mackinac-py27)$ ipython kernel install --name "Mackinac Python 27" --user
 
 3. Start the Jupyter notebook server with this command::
 
-    (modelseed-py27)$ juypter notebook
+    (mackinac-py27)$ juypter notebook
 
    Jupyter opens a web page in your default browser with a file browser.
 
 4. Navigate to the "documentation_builder" folder and click on the "modelseed.ipynb" notebook.
 
-5. After the notebook opens, from the "Kernel" menu, select "Change kernel" and click on "modelseed Python 27".
+5. After the notebook opens, from the "Kernel" menu, select "Change kernel" and click on "Mackinac Python 27".
 
 6. Now you can run the cells in the notebook.
-
