@@ -61,7 +61,7 @@ class RoleNotFoundError(Exception):
 
 
 def download_data_files(source_folder, config=default_config):
-    """ Download the data files required to calculate reaction likelioods.
+    """ Download the data files required to calculate reaction likelihoods.
 
         Calculating reaction likelihoods requires two data files: (1) a target feature
         ID to role ID mapping file, and (2) a fasta file of protein sequences for
@@ -154,7 +154,7 @@ def calculate_modelseed_likelihoods(model_id, config=default_config):
 
 
 def calculate_likelihoods(model_id, feature_list, template, config=default_config):
-    """ Calculate reaction likelihoods from annotated features of genome.
+    """ Calculate reaction likelihoods from annotated features of a genome.
 
     Parameters
     ----------
