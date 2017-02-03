@@ -51,29 +51,31 @@ Direct installation in virtual environment
 
 2. Clone the `git repository <https://github.com/mmundy42/mackinac>`_ to your computer.
 
-2. Create a virtualenv for Mackinac with these commands::
+    $ git clone https://github.com/mmundy42/mackinac.git
+
+3. Create a virtualenv for Mackinac with these commands::
 
     $ cd mackinac
-    $ mkvirtualenv --python /Library/Frameworks/Python.framework/Versions/2.7/bin/python mackinac-py27
+    $ mkvirtualenv --python python2 mackinac-py27
 
    Use the ``--python`` option to select a specific version of Python for the virtualenv. For example,
-   ``python=python3`` to select the latest python3 installed on the system.
+   ``python=python3`` to select the current python3 installed on the system.
 
    Note on macOS, matplotlib requires Python be installed as a framework but virtualenv creates a
    non-framework build of Python. See the `matplotlib FAQ <http://matplotlib.org/1.5.3/faq/virtualenv_faq.html>`__
    for details on a workaround.
 
-3. Upgrade pip and setuptools to the latest versions with these commands::
+4. Upgrade pip and setuptools to the latest versions with these commands::
 
     (mackinac-py27)$ pip install --upgrade pip setuptools
 
-4. Install all of the Mackinac dependencies with this command::
+5. Install all of the Mackinac dependencies with this command::
 
     (mackinac-py27) pip install -r requirements.txt
 
-   This command takes a few minutes while numpy, pandas, and libsbml are built in the virtualenv.
+   This command can take a few minutes while numpy, pandas, and libsbml are built in the virtualenv.
 
-5. Install the latest version of Mackinac with this command::
+6. Install the latest version of Mackinac with this command::
 
     (mackinac-py27)$ python setup.py install
 
