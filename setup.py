@@ -16,6 +16,13 @@ version = get_version(pep440=True)
 if 'sdist' in argv or 'bdist_wheel' in argv:
     update_release_version()
 
+requirements = [
+    'cobra>=0.5.4',
+    'six>=1.9.0',
+    'requests',
+    'configparser'
+]
+
 try:
     with open('README.rst') as handle:
         description = handle.read()
@@ -27,9 +34,11 @@ setup(
     version=version,
     packages=find_packages(),
     setup_requires=[],
-    install_requires=['cobra >= 0.5.6', 'six>=1.9.0', 'requests', 'configparser'],
+    install_requires=requirements,
     tests_require=['pytest'],
-    package_data={},
+    package_data={
+        '': ['VERSION']
+    },
     author='Michael Mundy, Helena Mendes-Soares, Nicholas Chia',
     author_email='mundy.michael@mayo.edu',
     description='Mackinac: A bridge between ModelSEED and COBRApy',
@@ -37,7 +46,7 @@ setup(
     license='BSD',
     keywords='metabolism biology optimization flux balance analysis fba',
     url='https://github.com/mmundy42/mackinac',
-    download_url='https://pypi.python.org/pypi/mackinac',
+    # download_url='https://pypi.python.org/pypi/mackinac',
     classifiers=[
         'Development Status :: 4 - Beta',
         'Environment :: Console',
