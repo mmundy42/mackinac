@@ -32,7 +32,7 @@ More information about opencobra is available at the
 `website <http://opencobra.github.io/>`_.
 
 Installation
-^^^^^^^^^^^^
+------------
 
 Use pip to install Mackinac from
 `PyPI <https://pypi.python.org/pypi/mackinac>`_ (we recommend doing this
@@ -79,23 +79,17 @@ Direct installation in virtual environment
 
     (mackinac-py27)$ python setup.py install
 
-
-Run tests to verify installation
---------------------------------
-
-You need to provide a username and password for the tests to obtain an authentication
-token.
-
-1. Install the pytest package with this command::
+7. Install the pytest package with this command::
 
     (mackinac-py27)$ pip install pytest
 
-2. Substitute your PATRIC username and password and run the tests with this command::
+8. You need to provide a username and password for the tests to obtain an authentication
+   token. Substitute your PATRIC username and password and run the tests with this command::
 
     (mackinac-py27)$ TEST_USERNAME=<username> TEST_PASSWORD=<password> pytest mackinac/test
 
 Run examples in a notebook
---------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 An example of how to use Mackinac is provided in a notebook. Here's how to start Jupyter and run
 the notebook from the virtualenv.
@@ -119,3 +113,12 @@ the notebook from the virtualenv.
 5. After the notebook opens, from the "Kernel" menu, select "Change kernel" and click on "Mackinac Python 27".
 
 6. Now you can run the cells in the notebook.
+
+References
+----------
+
+Mackinac Bridge
+^^^^^^^^^^^^^^^
+
+The `Mackinac Bridge <http://www.mackinacbridge.org>`_ is one of the longest suspension bridges in
+the United States and spans the Straits of Mackinac to connect the Upper and Lower Peninsulas of Michigan.
