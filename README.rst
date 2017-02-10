@@ -117,6 +117,10 @@ the notebook from the virtualenv.
 References
 ----------
 
+1. cobrapy `doi:10.1186/1752-0509-7-74 <http://dx.doi.org/doi:10.1186/1752-0509-7-74>`_
+2. ModelSEED `doi:10.1038/nbt.1672 <http://dx.doi.org/doi:10.1038/nbt.1672>`_
+3. PATRIC `doi:10.1093/nar/gkt1099 <http://dx.doi.org/doi:10.1093/nar/gkt1099>`_
+
 Mackinac Bridge
 ^^^^^^^^^^^^^^^
 
