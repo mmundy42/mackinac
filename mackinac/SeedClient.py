@@ -1,5 +1,7 @@
 from __future__ import absolute_import
 import requests
+from requests.exceptions import Timeout
+from warnings import warn
 import configparser
 import json
 from os import environ, path
@@ -8,7 +10,7 @@ import base64
 import six
 
 
-def get_token(username, password=None, token_type='patric', timeout=5):
+def get_token(username, password=None, token_type='patric', timeout=30):
     """ Get an authentication token for SEED web services.
 
         The authentication token is also stored in the .patric_config file in
@@ -41,7 +43,12 @@ def get_token(username, password=None, token_type='patric', timeout=5):
     if token_type == 'patric':
         url = 'https://user.patricbrc.org/authenticate'
         request_data = {'username': username, 'password': password}
-        response = requests.post(url, data=request_data, timeout=timeout)
+        try:
+            response = requests.post(url, data=request_data, timeout=timeout)
+        except Timeout as e:
+            warn('The PATRIC authentication service did not return a response within {0} seconds. '
+                 'Try again with a larger timeout value. (Details: {1})'.format(timeout, e))
+            return None
         if response.status_code != requests.codes.OK:
             response.raise_for_status()
         token = response.text
@@ -53,7 +60,12 @@ def get_token(username, password=None, token_type='patric', timeout=5):
         headers['Content-Type'] = 'application/json'
         headers['Authorization'] = 'Basic {0}'\
             .format(base64.urlsafe_b64encode(six.b(username + ':' + password)).decode("ascii"))
-        response = requests.get(url, headers=headers, timeout=timeout)
+        try:
+            response = requests.get(url, headers=headers, timeout=timeout)
+        except Timeout as e:
+            warn('The RAST authentication service did not return a response within {0} seconds. '
+                 'Try again with a larger timeout value. (Details: {1})'.format(timeout, e))
+            return None
         if response.status_code != requests.codes.OK:
             response.raise_for_status()
         data = json.loads(response.text)
