@@ -929,7 +929,9 @@ def _wait_for_job(jobid):
         if jobid in jobs:
             task = jobs[jobid]
             if task['status'] == 'failed':
-                raise ServerError(task['error'])
+                if 'error' in task:
+                    raise ServerError(task['error'])
+                raise ServerError('Job submitted to ModelSEED app service failed, no details provided in response')
             elif task['status'] == 'completed':
                 done = True
             else:
