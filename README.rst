@@ -43,6 +43,27 @@ inside a `virtual environment
 
 Mackinac requires the cobrapy, requests, configparser, and six packages.
 
+Web service URLs
+----------------
+
+Mackinac uses web services provided by other organizations which can be offline, the interface can
+change, or the URL can change. Mackinac uses these default URLs:
+
+* ModelSEED web service at https://p3.theseed.org/services/ProbModelSEED
+* Workspace web service at https://p3.theseed.org/services/Workspace
+* PATRIC web service at https://www.patricbrc.org/api/
+
+Alternate URLs include the following:
+
+* ModelSEED web service at http://p3c.theseed.org/dev1/services/ProbModelSEED
+
+You can change the URL used to connect to a web service as shown below:
+
+    >>> import mackinac
+    >>> mackinac.modelseed.ms_client.url = 'https://p3.theseed.org/services/ProbModelSEED'
+    >>> mackinac.workspace.ws_client.url = 'https://p3.theseed.org/services/Workspace'
+    >>> mackinac.genome.patric_url = 'https://www.patricbrc.org/api/'
+
 Direct installation in virtual environment
 ------------------------------------------
 
