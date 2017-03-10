@@ -275,13 +275,15 @@ def get_modelseed_model_stats(model_id):
     return stats
 
 
-def list_modelseed_models(base_folder=None, print_output=False):
+def list_modelseed_models(base_folder=None, sort_key='rundate', print_output=False):
     """ List the ModelSEED models for the user.
 
     Parameters
     ----------
     base_folder : str
         Workspace reference to folder to search for models
+    sort_key : {'rundate', 'id', 'name'}, optional
+        Name of field to use as sort key for output
     print_output : bool, optional
         When True, print a summary of the list instead of returning the list
 
@@ -299,6 +301,10 @@ def list_modelseed_models(base_folder=None, print_output=False):
         output = ms_client.call('list_models', params)
     except ServerError as e:
         handle_server_error(e)
+    reverse = False
+    if sort_key == 'rundate':
+        reverse = True
+    output.sort(key=itemgetter(sort_key), reverse=reverse)
     if not print_output:
         return output
     for model in output:
