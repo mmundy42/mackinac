@@ -598,7 +598,7 @@ def create_cobra_model_from_modelseed_model(model_id, id_type='modelseed', valid
             num_duplicates += 1
 
     # Report the number of duplicate metabolites.
-    if num_duplicates > 0:
+    if validate and num_duplicates > 0:
         warn('{0} duplicate metabolites were removed from model {1} of {2}'
              .format(num_duplicates, model.id, model.name))
 
