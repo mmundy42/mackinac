@@ -15,7 +15,7 @@ except:
 
 setup(
     name='mackinac',
-    version='0.8.0',
+    version='0.8.1',
     packages=find_packages(),
     setup_requires=[],
     install_requires=requirements,
