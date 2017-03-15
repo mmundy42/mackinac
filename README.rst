@@ -121,26 +121,26 @@ the notebook from the virtualenv.
 
 2. Install a kernel that uses the virtualenv installation with this command::
 
-    (mackinac-py27)$ ipython kernel install --name "Mackinac Python 27" --user
+    (mackinac-py27)$ ipython kernel install --name "Mackinac_Python27" --user
 
 3. Start the Jupyter notebook server with this command::
 
-    (mackinac-py27)$ juypter notebook
+    (mackinac-py27)$ jupyter notebook
 
    Jupyter opens a web page in your default browser with a file browser.
 
 4. Navigate to the "documentation_builder" folder and click on the "modelseed.ipynb" notebook.
 
-5. After the notebook opens, from the "Kernel" menu, select "Change kernel" and click on "Mackinac Python 27".
+5. After the notebook opens, from the "Kernel" menu, select "Change kernel" and click on "Mackinac_Python27".
 
 6. Now you can run the cells in the notebook.
 
 References
 ----------
 
-1. cobrapy `doi:10.1186/1752-0509-7-74 <http://dx.doi.org/doi:10.1186/1752-0509-7-74>`_
-2. ModelSEED `doi:10.1038/nbt.1672 <http://dx.doi.org/doi:10.1038/nbt.1672>`_
-3. PATRIC `doi:10.1093/nar/gkt1099 <http://dx.doi.org/doi:10.1093/nar/gkt1099>`_
+1. `COBRApy: COnstraints-Based Reconstruction and Analysis for Python <http://dx.doi.org/doi:10.1186/1752-0509-7-74>`_
+2. `High-throughput generation, optimization and analysis of genome-scale metabolic models <http://dx.doi.org/doi:10.1038/nbt.1672>`_ (ModelSEED)
+3. `PATRIC, the bacterial bioinformatics database and analysis resource <http://dx.doi.org/doi:10.1093/nar/gkt1099>`_
 
 Mackinac Bridge
 ^^^^^^^^^^^^^^^
