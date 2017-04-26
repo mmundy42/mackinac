@@ -1,12 +1,24 @@
 from warnings import warn
 
-from cobra.core import Metabolite, Reaction, Model
+from cobra.core import Metabolite
 
-from .util import read_source_file
+from .templatereaction import TemplateReaction
+
+# Required fields in source file for creating a universal metabolite.
+universal_metabolite_fields = {
+    'id', 'formula', 'name', 'charge', 'abbreviation', 'source', 'structure',
+    'pka', 'pkb', 'mass', 'deltag', 'deltagerr', 'aliases'
+}
+
+# Required fields in source file for creating a universal reaction.
+universal_reaction_fields = {
+    'id', 'name', 'abbreviation', 'code', 'stoichiometry', 'direction', 'reversibility', 'status',
+    'deltag', 'deltagerr', 'aliases', 'linked_reaction', 'is_obsolete', 'is_transport'
+}
 
 
 def create_universal_metabolite(fields, names):
-    """ Create a metabolite for the universal model.
+    """ Create a Metabolite object from a list of fields for a universal metabolite.
 
     Parameters
     ----------
@@ -25,10 +37,9 @@ def create_universal_metabolite(fields, names):
     if fields[names['is_obsolete']] == '1':
         return None
 
-    # Create a Metabolite object. All metabolites are placed in the "0" compartment.
-    # @todo This means the universal metabolite ID will need to be adjusted when
-    # building a template model.
-    metabolite = Metabolite(id=fields[names['id']]+'_0',
+    # Create a Metabolite object. All metabolites are placed in the default compartment.
+    # @todo Use a constant for default compartment?
+    metabolite = Metabolite(id=fields[names['id']] + '_0',
                             formula=fields[names['formula']],
                             name=fields[names['name']],
                             charge=float(fields[names['charge']]),
@@ -72,7 +83,7 @@ def create_universal_metabolite(fields, names):
 
 
 def create_universal_reaction(fields, names):
-    """ Create a reaction for the universal model.
+    """ Create a TemplateReaction object from a list of fields for a universal reaction.
 
     Parameters
     ----------
@@ -91,17 +102,17 @@ def create_universal_reaction(fields, names):
     if fields[names['is_obsolete']] == '1' or fields[names['status']] == 'EMPTY':
         return None
 
-    # Create a Reaction object. Note that lower bound, upper bound, and metabolites
-    # need to be set later when the universal metabolites are available using
-    # the data stored in the "stoichiometry" note.
-    reaction = Reaction(id=fields[names['id']], name=fields[names['name']])
+    # Create a TemplateReaction object. Note that lower bound, upper bound, and
+    # metabolites need to be set later using the data stored in the "stoichiometry"
+    # note and the complete list of universal metabolites.
+    reaction = TemplateReaction(id=fields[names['id']], name=fields[names['name']])
+    reaction.universal_direction = fields[names['direction']]
+    reaction.universal_reversibility = fields[names['reversibility']]
 
     # Add extended information as notes.
     reaction.notes['abbreviation'] = fields[names['abbreviation']]
     reaction.notes['code'] = fields[names['code']]
     reaction.notes['stoichiometry'] = fields[names['stoichiometry']]
-    reaction.notes['direction'] = fields[names['direction']]
-    reaction.notes['reversibility'] = fields[names['reversibility']]
     reaction.notes['status'] = fields[names['status']]
     if fields[names['deltag']] != 'null':
         reaction.notes['deltag'] = float(fields[names['deltag']])
@@ -125,112 +136,89 @@ def create_universal_reaction(fields, names):
     return reaction
 
 
-def create_universal_model_from_source(metabolites_filename, reactions_filename,
-                                       validate=False, verbose=False):
-    """ Create universal model from ModelSEED source files.
+def resolve_universal_reactions(reactions, metabolites, validate=False, verbose=False):
+    """ Resolve metabolites for universal reactions.
 
-    In the ModelSEED reaction source file, each metabolite in the reaction stoichiometry 
-    is expressed in this format:
+    In the ModelSEED universal reaction source file, each metabolite in the reaction 
+    stoichiometry is expressed in this format:
 
         n:ID:m:i:"NAME"
 
     where "n" is the metabolite coefficient and a negative number indicates a reactant
     and a positive number indicates a product, "ID" is the metabolite ID, "m" is the
     compartment index number, "i" is the community index number, and "NAME" is the 
-    metabolite name. Metabolites are separated by semicolon. Only the coefficient and
-    ID are used when creating a Reaction object.
+    metabolite name. Metabolites are separated by semicolon. The coefficient, ID, and
+    compartment index number are used to resolve the metabolites.
 
-    Reactions marked as obsolete are not included.
+    Metabolites for additional compartments may be added to the list metabolites.
     
     Parameters
     ----------
-    metabolites_filename : str
-        Path to metabolites file
-    reactions_filename : str
-        Path to reactions file
+    reactions : cobra.core.DictList
+        List of TemplateReaction objects for universal reactions
+    metabolites : cobra.core.DictList
+        List of cobra.core.Metabolite objects
     validate : bool, optional
         When True, check for common problems
     verbose : bool, optional
         When True, show all warning messages
 
-    Returns
-    -------
-    cobra.core.Model
-         COBRA model created from source files
     """
 
-    # Use a cobra.core.Model object as a container for universal reactions and
-    # metabolites. A universal model does not have compartments. A universal
-    # model has no objective since it is not meant to be solved.
-    universal = Model('ms_universal', name='ModelSEED universal model')
-
-    # Add metabolites and reactions to the model by processing the source files.
-    # Note that metabolites are NOT set in the reactions as they are processed
-    # because the metabolites are not available in the get_universal_reactions()
-    # function.
-    required = {'id', 'abbreviation', 'name', 'formula', 'mass', 'source',
-                'structure', 'charge', 'is_core', 'is_obsolete', 'linked_compound',
-                'is_cofactor', 'deltag', 'deltagerr', 'pka', 'pkb',
-                'abstract_compound', 'comprised_of', 'aliases'}
-    universal.add_metabolites(read_source_file(metabolites_filename, required, create_universal_metabolite))
-    required = {'id', 'name', 'abbreviation', 'code', 'stoichiometry', 'direction',
-                'reversibility', 'status', 'deltag', 'deltagerr', 'aliases',
-                'linked_reaction', 'is_obsolete', 'is_transport'}
-    universal.add_reactions(read_source_file(reactions_filename, required, create_universal_reaction))
-
     # Parse the reaction stoichiometry to set the metabolites, lower bound, and upper bound.
-    for reaction in universal.reactions:
-        # Set upper and lower bounds based directionality. Switch reverse
+    for rxn in reactions:
+        # Set upper and lower bounds based on directionality. Switch reverse
         # reactions to forward reactions.
         reverse = 1.0
-        if reaction.notes['direction'] == '=':
+        if rxn.notes['direction'] == '=':
             lower_bound = -1000.0
             upper_bound = 1000.0
-        elif reaction.notes['direction'] == '>':
+        elif rxn.notes['direction'] == '>':
             lower_bound = 0.0
             upper_bound = 1000.0
-        elif reaction.notes['direction'] == '<':
+        elif rxn.notes['direction'] == '<':
             lower_bound = 0.0
             upper_bound = 1000.0
             reverse = -1.0
         else:
             warn('Reaction direction {0} assumed to be reversible for reaction {1}'
-                 .format(reaction.notes['direction'], reaction.id))
+                 .format(rxn.notes['direction'], rxn.id))
             lower_bound = -1000.0
             upper_bound = 1000.0
-        reaction.bounds = (lower_bound, upper_bound)
+        rxn.bounds = (lower_bound, upper_bound)
 
         # Parse the "stoichiometry" note to set the metabolites. Add metabolites
-        # that are in compartments other than the default compartment.
-        metabolites = dict()
-        metabolite_list = reaction.notes['stoichiometry'].split(';')
+        # that are in compartments other than the default compartment. See description
+        # of stoichiometry format above.
+        reaction_metabolites = dict()
+        metabolite_list = rxn.notes['stoichiometry'].split(';')
         for met in metabolite_list:
             fields = met.split(':')
             metabolite_id = '{0}_{1}'.format(fields[1], fields[2])
-            if universal.metabolites.has_id(metabolite_id):
-                model_metabolite = universal.metabolites.get_by_id(metabolite_id)
-            else:
-                model_metabolite = universal.metabolites.get_by_id(fields[1] + '_0').copy()
+            try:
+                model_metabolite = metabolites.get_by_id(metabolite_id)
+            except KeyError:
+                model_metabolite = metabolites.get_by_id(fields[1] + '_0').copy()
                 model_metabolite.id = '{0}_{1}'.format(fields[1], fields[2])
                 model_metabolite.compartment = fields[2]
-                universal.add_metabolites([model_metabolite])
-            metabolites[model_metabolite] = float(fields[0]) * reverse
-        reaction.add_metabolites(metabolites)
+                metabolites.append(model_metabolite)
+            reaction_metabolites[model_metabolite] = float(fields[0]) * reverse
+        rxn.add_metabolites(reaction_metabolites)
 
-    # If requested, run checks to validate the universal model.
+    # If requested, run checks to validate the reactions.
     if validate:
         num_unbalanced = 0
-        for reaction in universal.reactions:
+        for rxn in reactions:
             try:
-                unbalanced = reaction.check_mass_balance()
+                unbalanced = rxn.check_mass_balance()
             except ValueError as e:
                 unbalanced = {'formula': e.message}
             if len(unbalanced) > 0:
                 if verbose:
                     warn('Reaction {0} is unbalanced because {1}\n    {2}'
-                         .format(reaction.id, unbalanced, reaction.build_reaction_string(use_metabolite_names=True)))
+                         .format(rxn.id, unbalanced, rxn.build_reaction_string(use_metabolite_names=True)))
                 num_unbalanced += 1
         if num_unbalanced > 0:
-            warn('Model {0} has {1} unbalanced reactions'.format(universal.id, num_unbalanced))
+            warn('Found {0} unbalanced universal reactions'.format(num_unbalanced))
 
-    return universal
+    return
