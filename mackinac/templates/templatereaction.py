@@ -96,10 +96,10 @@ class TemplateReaction(Reaction):
     def type(self, new_type):
         if new_type not in reaction_types:
             raise ValueError('Reaction type {0} is not valid', new_type)
-        if new_type == 'conditional' and self.complex_ids is None:
+        if new_type == 'conditional' and len(self.complex_ids) == 0:
             raise ValueError('Conditional reaction {0} must have at least one complex'
                              .format(self.id))
-        if new_type == 'gapfilling' and self.complex_ids is not None:
+        if new_type == 'gapfilling' and len(self.complex_ids) > 0:
             raise ValueError('Gapfilling reaction {0} must have no complexes'
                              .format(self.id))
         self._type = new_type
