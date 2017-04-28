@@ -1,6 +1,11 @@
 from warnings import warn
+import re
 
 from cobra.core import DictList
+
+
+# Regular expression for compartment suffix on a universal metabolite ID
+universal_compartment_suffix_re = re.compile(r'_([\d]+)$')
 
 
 class DuplicateError(Exception):
@@ -90,3 +95,25 @@ def read_source_file(filename, required, creator):
     if skipped > 0:
         warn('{0} lines in "{1}" were skipped because object could not be created'.format(skipped, filename))
     return object_list
+
+
+def change_compartment(metabolite, new_compartment):
+    """ Change the compartment of a universal metabolite. 
+    
+    Parameters
+    ----------
+    metabolite : cobra.core.Metabolite
+        Metabolite object to be changed
+    new_compartment : str
+        ID of new compartment for metabolite
+        
+    Returns
+    -------
+    cobra.core.Metabolite
+        Updated Metabolite object
+    """
+
+    metabolite.compartment = new_compartment
+    stripped_id = re.sub(universal_compartment_suffix_re, '', metabolite.id)
+    metabolite.id = '{0}_{1}'.format(stripped_id, new_compartment)
+    return metabolite
