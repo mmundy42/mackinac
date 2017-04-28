@@ -170,13 +170,13 @@ def resolve_universal_reactions(reactions, metabolites, validate=False, verbose=
         # Set upper and lower bounds based on directionality. Switch reverse
         # reactions to forward reactions.
         reverse = 1.0
-        if rxn.notes['direction'] == '=':
+        if rxn.universal_direction == '=':
             lower_bound = -1000.0
             upper_bound = 1000.0
-        elif rxn.notes['direction'] == '>':
+        elif rxn.universal_direction == '>':
             lower_bound = 0.0
             upper_bound = 1000.0
-        elif rxn.notes['direction'] == '<':
+        elif rxn.universal_direction == '<':
             lower_bound = 0.0
             upper_bound = 1000.0
             reverse = -1.0
