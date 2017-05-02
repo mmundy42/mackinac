@@ -219,6 +219,16 @@ class TemplateBiomass(Object):
         self._metabolites = dict()
         return
 
+    def get_metabolites(self):
+        """ Get the cobra.core.Metabolite objects for metabolites used in components.
+        
+        Returns
+        -------
+        list
+            List of cobra.core.Metabolite objects
+        """
+        return self._metabolites.values()
+
     def add_components(self, more_components, universal_metabolites):
         """ Add biomass components to the biomass entity.
         
@@ -230,7 +240,8 @@ class TemplateBiomass(Object):
             List of cobra.core.Metabolite objects available for template model
         """
 
-        # Resolve the metabolites used in the components.
+        # Metabolites used in a component must be available in the universal metabolites
+        # and depending on the coefficient type must have a non-zero mass.
         for component in more_components:
             if component.universal_id not in self._metabolites:
                 # Find the universal metabolite and make a copy.
@@ -261,7 +272,6 @@ class TemplateBiomass(Object):
                         except:
                             raise ValueError('Biomass "{0}" uses metabolite {1} which is not available'
                                              .format(self.id, universal_id))
-
                         change_compartment(metabolite, component.compartment_id)
                         self._metabolites[universal_id] = metabolite
 
