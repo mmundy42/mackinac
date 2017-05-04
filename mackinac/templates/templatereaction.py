@@ -1,4 +1,8 @@
+from six import string_types
+
 from cobra.core import Reaction
+
+from .util import change_compartment
 
 # Required fields in source file for creating a TemplateReaction object.
 reaction_fields = {
@@ -52,7 +56,7 @@ class TemplateReaction(Reaction):
         
     Attributes
     ----------
-    compartments : list of str, optional
+    _compartment_ids : list of str
         List of compartment IDs where reaction can occur
     base_cost : float
         Cost to add reaction to a model by gap fill algorithm (encodes all penalties)
@@ -68,16 +72,16 @@ class TemplateReaction(Reaction):
         Default direction when added to a model by gene association (bi-directional, reverse, or forward)
     gapfill_direction : {'<', '>', '?'}
         Direction when directionality is reversed by gap fill algorithm (reverse, forward, unknown)
-    type : {'universal', 'spontaneous', 'conditional', 'gapfilling'}
+    _type : {'universal', 'spontaneous', 'conditional', 'gapfilling'}
         Type used when adding reaction to a model
-    complex_ids : list of str
+    _complex_ids : list of str
         List of IDs for complexes that catalyze the reaction
     """
 
     def __init__(self, id=None, name=''):
         Reaction.__init__(self, id, name)
 
-        self._compartments = list()
+        self._compartment_ids = list()
         self.base_cost = 0.0
         self.forward_cost = 0.0
         self.reverse_cost = 0.0
@@ -110,16 +114,60 @@ class TemplateReaction(Reaction):
 
     @complex_ids.setter
     def complex_ids(self, new_ids):
-        # @todo Be clever and distinguish between list and string
-        if new_ids != 'null':
-            self._complex_ids = new_ids.split('|')
+        if isinstance(new_ids, string_types):
+            if new_ids != 'null':
+                self._complex_ids = new_ids.split('|')
+        elif isinstance(new_ids, list):
+            self._complex_ids = new_ids
+        else:
+            raise TypeError('Complex IDs for a reaction must be a string or a list')
 
     @property
-    def compartments(self):
-        return self._compartments
+    def compartment_ids(self):
+        return self._compartment_ids
 
-    @compartments.setter
-    def compartments(self, new_compartments):
-        # @todo Be clever and distinguish between list and string
-        if new_compartments != 'null':
-            self._compartments = new_compartments.split('|')
+    @compartment_ids.setter
+    def compartment_ids(self, new_ids):
+        if isinstance(new_ids, string_types):
+            if new_ids != 'null':
+                self._compartment_ids = new_ids.split('|')
+        elif isinstance(new_ids, list):
+            self._compartment_ids = new_ids
+        else:
+            raise TypeError('Compartment IDs for a reaction must be a string or a list')
+
+    def make_model_id(self):
+        return '{0}_{1}'.format(self.id, self.compartment_ids[0])
+
+    def create_model_reaction(self, compartments, genes):
+        """ Create a cobra.core.Reaction object for an organism model.
+        
+        Parameters
+        ----------
+        genes : list of str
+            List of gene IDs for reaction
+        """
+
+        # Create the Reaction object and add all of the metabolites.
+        # Tack the first compartment ID on the end of the reaction ID
+        reaction = Reaction(id=self.make_model_id(),
+                            name=self.name,
+                            lower_bound=self.lower_bound,
+                            upper_bound=self.upper_bound)
+        # Need to put metabolites in compartments
+        model_metabolites = dict()
+        for met in self.metabolites:
+            mm = met.copy()
+            mc = compartments.get_by_id(mm.compartment)
+            if mc.model_id != self._compartment_ids[int(mc.id)]:
+                raise ValueError('Inconsistent compartment IDs')
+
+            change_compartment(mm, mc.model_id) # need to index here
+            model_metabolites[mm] = self.metabolites[met]
+        reaction.add_metabolites(model_metabolites)
+
+        # If features are associated with the reaction, add the GPR.
+        if genes is not None:
+            reaction.gene_reaction_rule = '('+' or '.join([f.id for f in genes])+')'
+
+        return reaction
