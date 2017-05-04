@@ -70,7 +70,7 @@ Direct installation in virtual environment
    <http://virtualenvwrapper.readthedocs.io/en/stable/install.html#shell-startup-file>`_.
 
 2. Clone the `git repository <https://github.com/mmundy42/mackinac>`_ to your
-  computer with this command::
+   computer with this command::
 
     $ git clone https://github.com/mmundy42/mackinac.git
 
