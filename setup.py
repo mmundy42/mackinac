@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 requirements = [
     'cobra>=0.5.4',
-    'six>=1.9.0',
+    'six',
     'requests',
     'configparser'
 ]

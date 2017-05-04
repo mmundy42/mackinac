@@ -11,7 +11,10 @@ from .SeedClient import SeedClient, ServerError, ObjectNotFoundError, JobError, 
 from .workspace import get_workspace_object_meta, get_workspace_object_data, put_workspace_object
 
 # ModelSEED service endpoint
-modelseed_url = 'https://p3.theseed.org/services/ProbModelSEED'
+modelseed_url = 'http://p3c.theseed.org/dev1/services/ProbModelSEED'
+
+# Former ModelSEED production service endpoint
+prod_modelseed_url = 'https://p3.theseed.org/services/ProbModelSEED'
 
 # Client for running functions on ModelSEED web service
 ms_client = SeedClient(modelseed_url, 'ProbModelSEED')

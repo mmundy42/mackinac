@@ -41,73 +41,77 @@ inside a `virtual environment
 
     pip install mackinac
 
-Mackinac requires the cobrapy, requests, configparser, and six packages.
-
 Web service URLs
 ----------------
 
-Mackinac uses web services provided by other organizations which can be offline, the interface can
-change, or the URL can change. Mackinac uses these default URLs:
+Mackinac uses web services provided by other organizations which can be offline,
+the interface can change, or the URL can change. Mackinac uses these default URLs:
 
-* ModelSEED web service at https://p3.theseed.org/services/ProbModelSEED
+* ModelSEED web service at http://p3c.theseed.org/dev1/services/ProbModelSEED
 * Workspace web service at https://p3.theseed.org/services/Workspace
 * PATRIC web service at https://www.patricbrc.org/api/
 
 Alternate URLs include the following:
 
-* ModelSEED web service at http://p3c.theseed.org/dev1/services/ProbModelSEED
+* Former production ModelSEED web service at https://p3.theseed.org/services/ProbModelSEED
 
 You can change the URL used to connect to a web service as shown below:
 
     >>> import mackinac
-    >>> mackinac.modelseed.ms_client.url = 'https://p3.theseed.org/services/ProbModelSEED'
+    >>> mackinac.modelseed.ms_client.url = 'http://p3c.theseed.org/dev1/services/ProbModelSEED'
     >>> mackinac.workspace.ws_client.url = 'https://p3.theseed.org/services/Workspace'
     >>> mackinac.genome.patric_url = 'https://www.patricbrc.org/api/'
 
 Direct installation in virtual environment
 ------------------------------------------
 
-1. If virtualenvwrapper is not installed, `follow the directions <https://virtualenvwrapper.readthedocs.io/en/latest/>`__
-   to install virtualenvwrapper.
+1. If virtualenvwrapper is not installed, `follow the directions <https://virtualenvwrapper.readthedocs.io/en/stable/>`__
+   to install virtualenvwrapper. You should also `update your shell startup file
+   <http://virtualenvwrapper.readthedocs.io/en/stable/install.html#shell-startup-file>`_.
 
-2. Clone the `git repository <https://github.com/mmundy42/mackinac>`_ to your computer.
+2. Clone the `git repository <https://github.com/mmundy42/mackinac>`_ to your
+  computer with this command::
 
     $ git clone https://github.com/mmundy42/mackinac.git
 
 3. Create a virtualenv for Mackinac with these commands::
 
     $ cd mackinac
-    $ mkvirtualenv --python python2 mackinac-py27
+    $ mkvirtualenv mackinac
 
-   Use the ``--python`` option to select a specific version of Python for the virtualenv. For example,
-   ``python=python3`` to select the current python3 installed on the system.
+   Use the ``--python`` option to select a specific version of Python for the
+   virtualenv. For example, ``python=python3`` to select the current python3
+   installed on the system.
 
-   Note on macOS, matplotlib requires Python be installed as a framework but virtualenv creates a
-   non-framework build of Python. See the `matplotlib FAQ <http://matplotlib.org/1.5.3/faq/virtualenv_faq.html>`__
+   Note on macOS, matplotlib requires Python be installed as a framework but
+   virtualenv creates a non-framework build of Python. See the
+   `matplotlib FAQ <http://matplotlib.org/1.5.3/faq/virtualenv_faq.html>`__
    for details on a workaround.
 
 4. Upgrade pip and setuptools to the latest versions with these commands::
 
-    (mackinac-py27)$ pip install --upgrade pip setuptools
+    (mackinac)$ pip install --upgrade pip setuptools
 
 5. Install all of the Mackinac dependencies with this command::
 
-    (mackinac-py27) pip install -r requirements.txt
+    (mackinac)$ pip install -r requirements.txt
 
-   This command can take a few minutes while numpy, pandas, and libsbml are built in the virtualenv.
+   This command can take a few minutes while numpy, pandas, and libsbml are
+   built in the virtualenv.
 
 6. Install the latest version of Mackinac with this command::
 
-    (mackinac-py27)$ python setup.py install
+    (mackinac)$ python setup.py install
 
 7. Install the pytest package with this command::
 
-    (mackinac-py27)$ pip install pytest
+    (mackinac)$ pip install pytest
 
-8. You need to provide a username and password for the tests to obtain an authentication
-   token. Substitute your PATRIC username and password and run the tests with this command::
+8. You need to provide a username and password for the tests to obtain an
+   authentication token. Substitute your PATRIC username and password and run
+   the tests with this command::
 
-    (mackinac-py27)$ TEST_USERNAME=<username> TEST_PASSWORD=<password> pytest mackinac/test
+    (mackinac)$ TEST_USERNAME=<username> TEST_PASSWORD=<password> pytest mackinac/test -v
 
 Run examples in a notebook
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -117,23 +121,48 @@ the notebook from the virtualenv.
 
 1. Install Jupyter with this command::
 
-    (mackinac-py27)$ pip install jupyter
+    (mackinac)$ pip install jupyter
 
 2. Install a kernel that uses the virtualenv installation with this command::
 
-    (mackinac-py27)$ ipython kernel install --name "Mackinac_Python27" --user
+    (mackinac)$ ipython kernel install --name "Mackinac_Python27" --user
 
 3. Start the Jupyter notebook server with this command::
 
-    (mackinac-py27)$ jupyter notebook
+    (mackinac)$ jupyter notebook
 
    Jupyter opens a web page in your default browser with a file browser.
 
-4. Navigate to the "documentation_builder" folder and click on the "modelseed.ipynb" notebook.
+4. Navigate to the "documentation_builder" folder and click on the "modelseed.ipynb"
+   notebook.
 
-5. After the notebook opens, from the "Kernel" menu, select "Change kernel" and click on "Mackinac_Python27".
+5. After the notebook opens, from the "Kernel" menu, select "Change kernel" and
+   click on "Mackinac_Python27".
 
 6. Now you can run the cells in the notebook.
+
+Release Notes
+-------------
+
+Version 0.8.2 (May 5, 2017)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+* Removed dependency on a specific version of six package
+* Updated directions for virtual environment installation
+* Switched default ModelSEED service URL to current active server
+
+Version 0.8.1 (March 15, 2017)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+* Version corresponding to published paper
+
+How to cite Mackinac
+--------------------
+
+If you use Mackinac for an analysis, please cite this paper:
+`Mackinac: a bridge between ModelSEED and COBRApy to generate and analyze genome-scale
+metabolic models <https://dx.doi.org/doi:10.1093/bioinformatics/btx185>`_
+
 
 References
 ----------
@@ -145,5 +174,6 @@ References
 Mackinac Bridge
 ^^^^^^^^^^^^^^^
 
-The `Mackinac Bridge <http://www.mackinacbridge.org>`_ is one of the longest suspension bridges in
-the United States and spans the Straits of Mackinac to connect the Upper and Lower Peninsulas of Michigan.
+The `Mackinac Bridge <http://www.mackinacbridge.org>`_ is one of the longest
+suspension bridges in the United States and spans the Straits of Mackinac to
+connect the Upper and Lower Peninsulas of Michigan.
