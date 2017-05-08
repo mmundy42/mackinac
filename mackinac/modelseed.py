@@ -668,9 +668,9 @@ def create_cobra_model_from_modelseed_model(model_id, id_type='modelseed', valid
                             lower_bound=0.0,
                             upper_bound=1000.0)
         reaction.add_metabolites(biomass_metabolites)
+        model.add_reaction(reaction)
         if index == 0:
             reaction.objective_coefficient = 1.
-        model.add_reaction(reaction)
 
     # If requested, validate the COBRApy model.
     if validate:

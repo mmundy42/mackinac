@@ -144,6 +144,11 @@ the notebook from the virtualenv.
 Release Notes
 -------------
 
+Version 0.8.3 (May 8, 2017)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+* Fixed setting reaction objective coefficient with cobra 0.6
+
 Version 0.8.2 (May 5, 2017)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
