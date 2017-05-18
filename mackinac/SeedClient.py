@@ -109,8 +109,12 @@ class ServerError(Exception):
                 self.message = self.data[0][7:-7]
 
             # If the second line has the _ERROR_ delimiter, extract the message.
-            if self.data[0] == 'JSONRPC error:' and len(self.data) > 1 and self.data[1].startswith('_ERROR_'):
+            elif self.data[0] == 'JSONRPC error:' and len(self.data) > 1 and self.data[1].startswith('_ERROR_'):
                 self.message = self.data[1][7:-7]
+
+            # If the first line is a JSONRPC error and there is a second line, extract the message.
+            elif self.data[0] == 'JSONRPC error:' and len(self.data) > 1:
+                self.message = self.data[1]
 
             # Otherwise, use the first line as the message.
             else:
