@@ -541,7 +541,7 @@ def _add_reaction(modelseed_reaction, model, id_type, likelihoods):
         reaction.notes['likelihood_str'] = 'unknown'
 
     # Finally, add the reaction to the model.
-    model.add_reaction(reaction)
+    model.add_reactions([reaction])
 
     return
 
@@ -620,7 +620,7 @@ def create_cobra_model_from_modelseed_model(model_id, id_type='modelseed', valid
                                 upper_bound=1000.0)
             reaction.add_metabolites({metabolite: -1.0})
             reaction.notes['likelihood_str'] = 'n/a'
-            model.add_reaction(reaction)
+            model.add_reactions([reaction])
 
     # A ModelSEED model must have an exchange reaction for the special biomass metabolite.
     metabolite = model.metabolites.get_by_id('cpd11416'+cytosol_suffix)
@@ -629,7 +629,7 @@ def create_cobra_model_from_modelseed_model(model_id, id_type='modelseed', valid
                         lower_bound=-1000.0,
                         upper_bound=1000.0)
     reaction.add_metabolites({metabolite: -1.0})
-    model.add_reaction(reaction)
+    model.add_reactions([reaction])
 
     # Note that when ModelSEED exports to SBML, it includes exchange reactions for
     # cpd15302_c0 "Glycogen(n-1)" and cpd08636_c0 "4-5-dihydroxy-2-3-pentanedione".
@@ -641,7 +641,7 @@ def create_cobra_model_from_modelseed_model(model_id, id_type='modelseed', valid
     #                     lower_bound=-1000.0,
     #                     upper_bound=1000.0)
     # reaction.add_metabolites({metabolite: -1.0})
-    # model.add_reaction(reaction)
+    # model.add_reactions([reaction])
     #
     # metabolite = model.metabolites.get_by_id('cpd15302'+cytosol_suffix)
     # reaction = Reaction(id='EX_' + metabolite.id,
@@ -649,7 +649,7 @@ def create_cobra_model_from_modelseed_model(model_id, id_type='modelseed', valid
     #                     lower_bound=-1000.0,
     #                     upper_bound=1000.0)
     # reaction.add_metabolites({metabolite: -1.0})
-    # model.add_reaction(reaction)
+    # model.add_reactions([reaction])
 
     # Add the biomass reactions to the COBRApy model. ModelSEED models can have more than one biomass reaction
     # but the model does not identify which one to use as the objective so always use the first one.
@@ -668,7 +668,7 @@ def create_cobra_model_from_modelseed_model(model_id, id_type='modelseed', valid
                             lower_bound=0.0,
                             upper_bound=1000.0)
         reaction.add_metabolites(biomass_metabolites)
-        model.add_reaction(reaction)
+        model.add_reactions([reaction])
         if index == 0:
             reaction.objective_coefficient = 1.
 
@@ -779,7 +779,7 @@ def create_universal_model(template_reference, id_type='modelseed'):
         reaction.notes['type'] = template_reaction['type']
 
         # Finally, add the reaction to the model.
-        model.add_reaction(reaction)
+        model.add_reactions([reaction])
 
     return model
 
