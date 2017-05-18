@@ -144,6 +144,12 @@ the notebook from the virtualenv.
 Release Notes
 -------------
 
+Version 0.8.4 (May 18, 2017)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+* Fixed usages of deprecated cobra.core.Model.add_reaction() function
+* Added another way to parse error returned by ModelSEED server
+
 Version 0.8.3 (May 8, 2017)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
