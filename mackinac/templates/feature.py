@@ -2,13 +2,15 @@ import re
 
 from cobra.core import Object
 
-from .util import make_search_name
+from .util import make_search_name, ec_number_re
 
 # Regular expression to remove special characters from feature IDs because
 # they cause confusion in cobra.core.DictList objects.
+# @todo Also remove anything before the | character?
 special_chars_re = re.compile(r'\|')
 
 # Regular expression to split a function into roles.
+# @todo Confirm roles with / are being split as expected
 delimiter_re = re.compile(r'\s*;\s+|\s+[@/]\s+')
 
 # Dictionary of regular expressions for searching for compartment names in functions.
@@ -70,6 +72,8 @@ class Feature(Object):
         List of functional roles associated with feature
     search_roles : list of str
         List of functional roles modified for better string matching
+    ec_numbers : list of str
+        List of EC numbers found in the functional role strings
     """
 
     def __init__(self, id, function):
@@ -96,7 +100,13 @@ class Feature(Object):
             if len(found_compartments) > 0:
                 self.compartments = list(found_compartments)
 
-        # Split the function into roles if there is a delimiter with whitespace.
+        # Split the function into roles if there is a delimiter with whitespace
+        # and make a search name for each role.
         self.roles = re.split(delimiter_re, self.function)
         self.search_roles = [make_search_name(role) for role in self.roles]
+
+        # Find all of the EC numbers in all of the roles.
+        self.ec_numbers = list()
+        for role in self.roles:
+            self.ec_numbers.extend(re.findall(ec_number_re, role))
         return
