@@ -374,6 +374,23 @@ def _convert_suffix(modelseed_id, format_type):
     return modelseed_id
 
 
+def _remove_suffix(modelseed_string):
+    """ Remove a compartment suffix in ModelSEED source format from a string.
+    
+    Parameters
+    ----------
+    modelseed_string : str
+        String with compartment suffix in ModelSEED source format
+        
+    Returns
+    -------
+    str
+        String with compartment suffix removed
+    """
+
+    return re.sub(modelseed_suffix_re, '', modelseed_string)
+
+
 def _add_metabolite(modelseed_compound, model, id_type):
     """ Create a COBRApy Metabolite object from a ModelSEED compound dictionary and add it to COBRApy model.
 
@@ -395,7 +412,7 @@ def _add_metabolite(modelseed_compound, model, id_type):
     # Convert from ModelSEED format to COBRApy format.
     cobra_id = _convert_suffix(modelseed_compound['id'], id_type)
     cobra_compartment = _convert_compartment(modelseed_compound['modelcompartment_ref'].split('/')[-1], id_type)
-    cobra_name = _convert_suffix(modelseed_compound['name'], id_type)
+    cobra_name = _remove_suffix(modelseed_compound['name'])
 
     # A ModelSEED model usually contains duplicate compounds. Confirm that the duplicate
     # compound is an exact duplicate and ignore it.
@@ -502,6 +519,11 @@ def _add_reaction(modelseed_reaction, model, id_type, likelihoods):
                     if not model.genes.has_id(gene_id):
                         gene = Gene(gene_id, subunit['role'])  # Use the role name as the Gene name
                         model.genes.append(gene)
+                    # @todo If a different subunit role is found, should name of gene be updated to include it (with separator)?
+                    # else:
+                    #     gene = model.genes.get_by_id(gene_id)
+                    #     if gene.name != subunit['role']:
+                    #         print('{0}: {1} vs {2}'.format(gene.id, gene.name, subunit['role']))
                     feature_list.append(gene_id)
 
                 #  Join multiple features using an OR relationship.
