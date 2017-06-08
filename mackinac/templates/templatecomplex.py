@@ -1,3 +1,5 @@
+from six import string_types
+
 from cobra.core import Object
 
 # Required fields in source file for creating a TemplateComplex object.
@@ -26,14 +28,16 @@ def create_template_complex(fields, names):
         source=fields[names['source']],
         reference=fields[names['reference']],
         confidence=float(fields[names['confidence']]))
-    if fields[names['roles']] != 'null':
-        complx.roles = fields[names['roles']]
+    complx.roles = fields[names['roles']]
     return complx
 
 
 class TemplateComplex(Object):
     """ A complex is a set of chemical reactions that act in concert to effect a role.
 
+    A role dictionary has four keys: (1) 'role_id' (str), (2) 'type' (str), 
+    {3} 'optional' flag (int), (4) 'triggering' flag (int).
+    
     Parameters
     ----------
     id : str
@@ -49,10 +53,10 @@ class TemplateComplex(Object):
         
     Attributes
     ----------
-    roles : list of dict, optional
+    _roles : list of dict, optional
         List of roles that trigger the complex
     reaction_ids : list of str
-        IDs of reactions that do something to the complex
+        IDs of reactions that are catalyzed by the complex
     """
 
     def __init__(self, id, name='', source='', reference='', confidence=1.0):
@@ -73,11 +77,15 @@ class TemplateComplex(Object):
 
     @roles.setter
     def roles(self, new_roles):
-        # Link the complex to one or more roles.
-        links = new_roles.split('|')
-        for index in range(len(links)):
-            values = links[index].split(';')
-            self.roles.append({'role_id': values[0],
-                               'type': values[1],
-                               'optional': int(values[2]),
-                               'triggering': int(values[3])})
+        if isinstance(new_roles, string_types):
+            if new_roles != 'null':
+                for role in new_roles.split('|'):
+                    fields = role.split(';')
+                    self.roles.append({'role_id': fields[0],
+                                       'type': fields[1],
+                                       'optional': int(fields[2]),
+                                       'triggering': int(fields[3])})
+        elif isinstance(new_roles, list):
+            self._roles = new_roles
+        else:
+            raise TypeError('Roles for a complex must be a string or a list')
