@@ -1,4 +1,4 @@
-from warnings import warn
+from six import string_types
 
 from cobra.core import Object, DictList, Reaction
 
@@ -27,7 +27,7 @@ biomass_class_types = {
 # Valid values for biomass component coefficient types. The coefficient type controls how the
 # biomass component contributes to the overall biomass reaction.
 biomass_coefficient_types = {
-    'MOLFRACTION', 'MOLSPLIT', 'MASSFRACTION', 'MASSSPLIT','GC', 'AT', 'EXACT', 'MULTIPLIER'
+    'MOLFRACTION', 'MOLSPLIT', 'MASSFRACTION', 'MASSSPLIT', 'GC', 'AT', 'EXACT', 'MULTIPLIER'
 }
 
 
@@ -54,18 +54,7 @@ def create_template_biomass_component(fields, names):
     component.compartment_id = fields[names['compartment']]
     component.coefficient = float(fields[names['coefficient']])
     component.coefficient_type = fields[names['coefficient_type']]
-    if fields[names['linked_compounds']] != 'null':
-        linked_metabolites = fields[names['linked_compounds']].split('|')
-        if len(linked_metabolites) < 1:
-            raise ValueError('Biomass component {0} has invalid linked compound field'
-                             .format(fields[names['id']]))
-        for index in range(len(linked_metabolites)):
-            # A linked metabolite is specified with a universal ID and coefficient.
-            parts = linked_metabolites[index].split(':')
-            if len(parts) != 2:
-                raise ValueError('Biomass component {0} has invalid linked compound field'
-                                 .format(fields[names['id']]))
-            component.linked_metabolites[parts[0]] = float(parts[1])
+    component.linked_metabolites = fields[names['linked_compounds']]
     return component
 
 
@@ -89,17 +78,15 @@ class TemplateBiomassComponent(Object):
         Coefficient value where a negative number indicates a reactant and a positive value indicates a product
     _coefficient_type : str
         Type of coefficient (valid values in biomass_coefficient_types)
-    linked_metabolites : dict
+    _linked_metabolites : dict
         Dictionary with metabolite ID as key and coefficient as value for linked metabolites
     """
 
     def __init__(self, universal_id, biomass_id, class_type):
         # Generate a unique ID from the metabolite ID, biomass ID, and class of metabolite so
         # all components can be stored in one DictList in a TemplateBiomass object.
-        if class_type not in biomass_class_types:
-            # @todo Do not like duplicated code here but need class type to generate unique ID
-            raise ValueError('Component {0} in biomass {1} has class type {2} that is not valid'
-                             .format(self.id, self.biomass_id, class_type))
+        self._class_type = None
+        self.class_type = class_type
         Object.__init__(self, '{0}_{1}_{2}'.format(universal_id, biomass_id, class_type))
         self.universal_id = universal_id
         self.biomass_id = biomass_id
@@ -108,7 +95,7 @@ class TemplateBiomassComponent(Object):
         self.compartment_id = 'c'
         self.coefficient = 1.0
         self._coefficient_type = None
-        self.linked_metabolites = dict()
+        self._linked_metabolites = dict()
         return
 
     @property
@@ -132,6 +119,30 @@ class TemplateBiomassComponent(Object):
             raise ValueError('Component {0} in biomass {1} has coefficient type {2} that is not valid'
                              .format(self.id, self.biomass_id, new_type))
         self._coefficient_type = new_type
+
+    @property
+    def linked_metabolites(self):
+        return self._linked_metabolites
+
+    @linked_metabolites.setter
+    def linked_metabolites(self, new_metabolites):
+        if isinstance(new_metabolites, string_types):
+            if new_metabolites != 'null':
+                metabolites = new_metabolites.split('|')
+                if len(metabolites) < 1:
+                    raise ValueError('Biomass component {0} has invalid linked metabolite field'
+                                     .format(self.id))
+                for index in range(len(metabolites)):
+                    # A linked metabolite is specified with a universal ID and coefficient.
+                    parts = metabolites[index].split(':')
+                    if len(parts) != 2:
+                        raise ValueError('Biomass component {0} has invalid linked compound field'
+                                         .format(self.id))
+                    self._linked_metabolites[parts[0]] = float(parts[1])
+        elif isinstance(new_metabolites, dict):
+            self._linked_metabolites = new_metabolites
+        else:
+            raise TypeError('Linked metabolites for a biomass component must be a string or a dict')
 
 
 def create_template_biomass(fields, names):
@@ -366,9 +377,13 @@ class TemplateBiomass(Object):
                 if total_split > 0:
                     mass_split_mole_fraction = remaining_mole_fraction * mass_split_count[type] / total_split
                     mole_split_mole_fraction = remaining_mole_fraction * mole_split_count[type] / total_split
-                    molecular_weight[type] += mole_split_mole_fraction * mole_split_weight[type] / mole_split_count[type]
+                    molecular_weight[type] += (mole_split_mole_fraction
+                                               * mole_split_weight[type]
+                                               / mole_split_count[type])
                     if mass_split_count[type] > 0.0:
-                        molecular_weight[type] += mass_split_mole_fraction * getattr(self, type) / (mass_split_moles[type] / mass_split_count[type])
+                        molecular_weight[type] += (mass_split_mole_fraction
+                                                   * getattr(self, type)
+                                                   / (mass_split_moles[type] / mass_split_count[type]))
                     mass_split_fraction[type] = mass_split_mole_fraction
                     mole_split_fraction[type] = mole_split_mole_fraction
                 if molecular_weight[type] > 0.0:
@@ -400,11 +415,20 @@ class TemplateBiomass(Object):
                 coefficient = component.coefficient
 
             elif component.coefficient_type == 'MOLSPLIT':
-                coefficient = component.coefficient * moles[type] * mole_split_fraction[type] * 1000.0 / mole_split_count[type]
+                coefficient = (component.coefficient
+                               * moles[type]
+                               * mole_split_fraction[type]
+                               * 1000.0
+                               / mole_split_count[type])
 
             elif component.coefficient_type == 'MASSSPLIT':
                 mass = self._metabolites[component.universal_id].notes['mass']
-                coefficient = component.coefficient * getattr(self, type) * mass_split_fraction[type] / mass_split_count[type] / mass * 1000.0
+                coefficient = (component.coefficient
+                               * getattr(self, type)
+                               * mass_split_fraction[type]
+                               / mass_split_count[type]
+                               / mass
+                               * 1000.0)
 
             else:
                 coefficient = float(0)
