@@ -1,6 +1,6 @@
-from six import string_types
+from six import string_types, iteritems
 
-from cobra.core import Reaction
+from cobra.core import Reaction, Object
 
 from .util import change_compartment
 
@@ -12,6 +12,9 @@ reaction_fields = {
 
 # Valid values for template reaction type field.
 reaction_types = {'universal', 'spontaneous', 'conditional', 'gapfilling'}
+
+# Valid values for template reaction direction field.
+reaction_directions = {'=', '>', '<'}
 
 
 def create_template_reaction(fields, names):
@@ -31,9 +34,8 @@ def create_template_reaction(fields, names):
     """
 
     reaction = TemplateReaction(id=fields[names['id']])
-    reaction.compartments = fields[names['compartment']]
-    if fields[names['complexes']] != 'null':
-        reaction.complex_ids = fields[names['complexes']]
+    reaction.compartment_ids = fields[names['compartment']]
+    reaction.complex_ids = fields[names['complexes']]
     reaction.type = fields[names['type']]
     reaction.direction = fields[names['direction']]
     reaction.gapfill_direction = fields[names['gfdir']]
@@ -43,54 +45,57 @@ def create_template_reaction(fields, names):
     return reaction
 
 
-class TemplateReaction(Reaction):
+class TemplateReaction(Object):
     """ A reaction is a chemical process that converts one set of compounds (substrate)
         to another set (products).
 
     Parameters
     ----------
-    id : str, optional
+    id : str
         ID of reaction
-    name : str, optional
-        Name of reaction
         
     Attributes
     ----------
-    _compartment_ids : list of str
-        List of compartment IDs where reaction can occur
+    name : str
+        Descriptive name of reaction
     base_cost : float
         Cost to add reaction to a model by gap fill algorithm (encodes all penalties)
     forward_cost : float
         Cost to add reaction in forward direction to a model by gap fill algorithm
     reverse_cost : float
         Cost to add reaction in reverse direction to a model by gap fill algorithm
-    universal_direction : {'=', '<', '>'}
-        Universal direction (bi-directional, reverse, or forward)
-    universal_reversibility : {'=', '<', '>', '?'}
-        Universal reversibility (bi-directional, reverse, forward, or unknown)
-    direction : {'=', '<', '>'}
-        Default direction when added to a model by gene association (bi-directional, reverse, or forward)
-    gapfill_direction : {'<', '>', '?'}
-        Direction when directionality is reversed by gap fill algorithm (reverse, forward, unknown)
     _type : {'universal', 'spontaneous', 'conditional', 'gapfilling'}
         Type used when adding reaction to a model
+    _direction : {'=', '<', '>'}
+        Default direction when added to a model by gene association (bi-directional, reverse, or forward)
+    _bounds : tuple
+        Lower bound and upper bound (managed with direction)
+    _gapfill_direction : {'<', '>', '?'}
+        Direction when directionality is reversed by gap fill algorithm (reverse, forward, unknown)
     _complex_ids : list of str
         List of IDs for complexes that catalyze the reaction
+    _compartment_ids : list of str
+        List of compartment IDs where reaction can occur
+    _metabolites : dict
+        Metabolites and their stoichiometric coefficients for the reaction
+    model_id : str
+        ID of reaction in an organism model
     """
 
-    def __init__(self, id=None, name=''):
-        Reaction.__init__(self, id, name)
+    def __init__(self, id):
+        Object.__init__(self, id)
 
-        self._compartment_ids = list()
+        self.name = ''
         self.base_cost = 0.0
         self.forward_cost = 0.0
         self.reverse_cost = 0.0
-        self.universal_direction = None
-        self.universal_reversibility = None
-        self.direction = None
-        self.gapfill_direction = None
-        self._type = None
+        self._type = 'gapfilling'
+        self._direction = '='
+        self._bounds = (-1000.0, 1000.0)
+        self._gapfill_direction = '='
+        self._compartment_ids = list()
         self._complex_ids = list()
+        self._metabolites = dict()
 
     @property
     def type(self):
@@ -99,7 +104,7 @@ class TemplateReaction(Reaction):
     @type.setter
     def type(self, new_type):
         if new_type not in reaction_types:
-            raise ValueError('Reaction type {0} is not valid', new_type)
+            raise ValueError('Reaction type {0} is not valid for reaction {1}'.format(new_type, self.id))
         if new_type == 'conditional' and len(self.complex_ids) == 0:
             raise ValueError('Conditional reaction {0} must have at least one complex'
                              .format(self.id))
@@ -107,6 +112,33 @@ class TemplateReaction(Reaction):
             raise ValueError('Gapfilling reaction {0} must have no complexes'
                              .format(self.id))
         self._type = new_type
+
+    @property
+    def direction(self):
+        return self._direction
+
+    @direction.setter
+    def direction(self, new_direction):
+        if new_direction not in reaction_directions:
+            raise ValueError('Reaction direction {0} is not valid for reaction {1}'.format(new_direction, self.id))
+        self._direction = new_direction
+        if self._direction == '=':
+            self._bounds = (-1000.0, 1000.0)
+        elif self._direction == '>':
+            self._bounds = (0.0, 1000.0)
+        else:
+            self._bounds = (-1000.0, 0.0)
+
+    @property
+    def gapfill_direction(self):
+        return self._gapfill_direction
+
+    @gapfill_direction.setter
+    def gapfill_direction(self, new_direction):
+        if new_direction not in reaction_directions:
+            raise ValueError('Reaction gapfill direction {0} is not valid for reaction {1}'
+                             .format(new_direction, self.id))
+        self._gapfill_direction = new_direction
 
     @property
     def complex_ids(self):
@@ -136,38 +168,54 @@ class TemplateReaction(Reaction):
         else:
             raise TypeError('Compartment IDs for a reaction must be a string or a list')
 
-    def make_model_id(self):
-        return '{0}_{1}'.format(self.id, self.compartment_ids[0])
+    @property
+    def metabolites(self):
+        return self._metabolites.copy()
 
-    def create_model_reaction(self, compartments, genes):
+    @metabolites.setter
+    def metabolites(self, new_metabolites):
+        self._metabolites = new_metabolites.copy()
+
+    @property
+    def model_id(self):
+        # Always use the first compartment ID (no idea why ...)
+        return '{0}_{1}'.format(self.id, self._compartment_ids[0])
+
+    def create_model_reaction(self, compartments):
         """ Create a cobra.core.Reaction object for an organism model.
         
         Parameters
         ----------
-        genes : list of str
-            List of gene IDs for reaction
+        compartments : list of TemplateCompartment objects
+            Compartments in the organism model
+            
+        Returns
+        -------
+        cobra.core.Reaction
+            Reaction object for an organism model
         """
 
-        # Create the Reaction object and add all of the metabolites.
-        # Tack the first compartment ID on the end of the reaction ID
-        reaction = Reaction(id=self.make_model_id(),
-                            name=self.name,
-                            lower_bound=self.lower_bound,
-                            upper_bound=self.upper_bound)
-        # Need to put metabolites in compartments
+        # Create a new cobra.core.Reaction object.
+        model_reaction = Reaction(id=self.model_id, name=self.name,
+                                  lower_bound=self._bounds[0], upper_bound=self._bounds[1])
+
+        # Create new cobra.core.Metabolite objects and place them in a specific compartment.
         model_metabolites = dict()
-        for met in self.metabolites:
-            mm = met.copy()
-            mc = compartments.get_by_id(mm.compartment)
-            if mc.model_id != self._compartment_ids[int(mc.id)]:
-                raise ValueError('Inconsistent compartment IDs')
+        for metabolite, coefficient in iteritems(self._metabolites):
+            model_met = metabolite.copy()
+            model_compartment = compartments.get_by_id(model_met.compartment)
+            if model_compartment.model_id != self._compartment_ids[int(model_compartment.id)]:
+                raise ValueError('Inconsistent order of compartment IDs in template reaction {0}'
+                                 .format(self.id))
+            change_compartment(model_met, model_compartment.model_id)
+            model_metabolites[model_met] = coefficient
+        model_reaction.add_metabolites(model_metabolites)
 
-            change_compartment(mm, mc.model_id) # need to index here
-            model_metabolites[mm] = self.metabolites[met]
-        reaction.add_metabolites(model_metabolites)
+        # Add notes about the template reaction for reference.
+        model_reaction.notes['template_id'] = self.id
+        model_reaction.notes['gapfill_direction'] = self.gapfill_direction
+        model_reaction.notes['base_cost'] = self.base_cost
+        model_reaction.notes['forward_cost'] = self.forward_cost
+        model_reaction.notes['reverse_cost'] = self.reverse_cost
 
-        # If features are associated with the reaction, add the GPR.
-        if genes is not None:
-            reaction.gene_reaction_rule = '('+' or '.join([f.id for f in genes])+')'
-
-        return reaction
+        return model_reaction
