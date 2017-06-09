@@ -170,3 +170,39 @@ def make_search_name(name):
     # Remove special characters
     search_name = re.sub(special_chars_re, '', search_name)
     return search_name
+
+
+def print_reaction_to_roles(output):
+    """ Print output from TemplateModel.reaction_to_role() method.
+
+    Parameters
+    ----------
+    output : dict
+        Dictionary keyed by reaction ID with details on each role linked to reaction
+    """
+
+    for reaction_id in sorted(output):
+        print('{0} "{1}" links to {2} roles'
+              .format(reaction_id, output[reaction_id]['name'], len(output[reaction_id]['roles'])))
+        for role_id in sorted(output[reaction_id]['roles']):
+            data = output[reaction_id]['roles'][role_id]
+            print('    {0} "{1}" from complex {2}'.format(role_id, data['name'], data['complex_id']))
+    return
+
+
+def print_role_to_reactions(output):
+    """ Print output from TemplateModel.role_to_reaction() method.
+    
+    Parameters
+    ----------
+    output : dict
+        Dictionary keyed by role ID with details on each reaction linked to role
+    """
+
+    for role_id in sorted(output):
+        print('{0} "{1}" links to {2} reactions'
+              .format(role_id, output[role_id]['name'], len(output[role_id]['reactions'])))
+        for reaction_id in sorted(output[role_id]['reactions']):
+            data = output[role_id]['reactions'][reaction_id]
+            print('    {0} "{1}" from complex {2}'.format(reaction_id, data['name'], data['complex_id']))
+    return
