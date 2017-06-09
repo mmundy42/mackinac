@@ -1,8 +1,15 @@
 import re
+from collections import defaultdict
+import logging
 
-from cobra.core import Object
+from cobra.core import Object, DictList
 
 from .util import make_search_name, ec_number_re
+from ..modelseed import patric_gene_prefix_re
+
+
+# Logger for this module
+LOGGER = logging.getLogger(__name__)
 
 # Regular expression to remove special characters from feature IDs because
 # they cause confusion in cobra.core.DictList objects.
@@ -77,7 +84,7 @@ class Feature(Object):
     """
 
     def __init__(self, id, function):
-        Object.__init__(self, re.sub(special_chars_re, '.', id))
+        Object.__init__(self, re.sub(patric_gene_prefix_re, '', id))
         self.function = function
         self.comment = 'none'
         self.compartments = ['u']  # Default is unknown compartment
@@ -110,3 +117,41 @@ class Feature(Object):
         for role in self.roles:
             self.ec_numbers.extend(re.findall(ec_number_re, role))
         return
+
+
+def create_features_from_patric(genome_features):
+    """ Create Feature objects for all of the features in a PATRIC genome annotation.
+
+    Use the get_genome_features() function to download a genome annotation.
+    
+    Parameters
+    ----------
+    genome_features : list of dict
+        List of genome features where each entry is a dict with keys that vary based on available data
+        
+    Returns
+    -------
+    cobra.core.DictList
+        List of Feature objects created from genome features
+    dict
+        Statistics about genome features
+    """
+
+    LOGGER.info('Started creating Feature objects from %d features', len(genome_features))
+    stats = defaultdict(int)
+    stats['num_genome_feature'] = len(genome_features)
+    feature_list = DictList()
+    for index in range(len(genome_features)):
+        try:
+            feature = Feature(genome_features[index]['patric_id'], genome_features[index]['product'])
+        except KeyError:
+            continue
+        feature_list.append(feature)
+        stats['num_product'] += 1
+        if len(feature.ec_numbers) > 1:
+            stats['num_multiple_ec_num'] += 1
+        if len(feature.roles) > 1:
+            stats['num_multiple_role'] += 1
+    LOGGER.info('Finished creating %d Feature objects', len(feature_list))
+
+    return feature_list, stats
