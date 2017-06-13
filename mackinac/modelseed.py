@@ -528,14 +528,14 @@ def _add_reaction(modelseed_reaction, model, id_type, likelihoods):
 
                 #  Join multiple features using an OR relationship.
                 if len(feature_list) > 1:
-                    subunit_list.append('( {0} )'.format(' or '.join(feature_list)))
+                    subunit_list.append('( {0} )'.format(' or '.join(sorted(feature_list))))
                 else:
                     subunit_list.append(feature_list[0])
 
             # Join multiple protein subunits using an AND relationship.
             if len(subunit_list) > 0:
                 if len(subunit_list) > 1:
-                    protein_list.append('( {0} )'.format(' and '.join(subunit_list)))
+                    protein_list.append('( {0} )'.format(' and '.join(sorted(subunit_list))))
                 else:
                     protein_list.append(subunit_list[0])
 
