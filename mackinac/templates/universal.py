@@ -1,8 +1,6 @@
 from warnings import warn
 
-from cobra.core import Metabolite
-
-from .templatereaction import TemplateReaction
+from cobra.core import Metabolite, Reaction
 
 # Required fields in source file for creating a universal metabolite.
 universal_metabolite_fields = {
@@ -18,7 +16,7 @@ universal_reaction_fields = {
 
 
 def create_universal_metabolite(fields, names):
-    """ Create a Metabolite object from a list of fields for a universal metabolite.
+    """ Create a cobra.core.Metabolite object from a list of fields for a universal metabolite.
 
     Parameters
     ----------
@@ -83,7 +81,7 @@ def create_universal_metabolite(fields, names):
 
 
 def create_universal_reaction(fields, names):
-    """ Create a TemplateReaction object from a list of fields for a universal reaction.
+    """ Create a cobra.core.Reaction object from a list of fields for a universal reaction.
 
     Parameters
     ----------
@@ -99,17 +97,18 @@ def create_universal_reaction(fields, names):
     """
 
     # If reaction is marked as obsolete or there are no metabolites, skip it.
-    if fields[names['is_obsolete']] == '1' or fields[names['status']] == 'EMPTY':
+    # @todo if fields[names['is_obsolete']] == '1' or fields[names['status']] == 'EMPTY':
+    if fields[names['status']] == 'EMPTY':
         return None
 
-    # Create a TemplateReaction object. Note that lower bound, upper bound, and
+    # Create a cobra.core.Reaction object. Note that lower bound, upper bound, and
     # metabolites need to be set later using the data stored in the "stoichiometry"
     # note and the complete list of universal metabolites.
-    reaction = TemplateReaction(id=fields[names['id']], name=fields[names['name']])
-    reaction.universal_direction = fields[names['direction']]
-    reaction.universal_reversibility = fields[names['reversibility']]
+    reaction = Reaction(id=fields[names['id']], name=fields[names['name']])
 
     # Add extended information as notes.
+    reaction.notes['universal_direction'] = fields[names['direction']]
+    reaction.notes['universal_reversibility'] = fields[names['reversibility']]
     reaction.notes['abbreviation'] = fields[names['abbreviation']]
     reaction.notes['code'] = fields[names['code']]
     reaction.notes['stoichiometry'] = fields[names['stoichiometry']]
@@ -167,22 +166,19 @@ def resolve_universal_reactions(reactions, metabolites, validate=False, verbose=
 
     # Parse the reaction stoichiometry to set the metabolites, lower bound, and upper bound.
     for rxn in reactions:
-        # Set upper and lower bounds based on directionality. Switch reverse
-        # reactions to forward reactions.
-        reverse = 1.0
-        if rxn.universal_direction == '=':
+        # Set upper and lower bounds based on directionality.
+        if rxn.notes['universal_direction'] == '=':
             lower_bound = -1000.0
             upper_bound = 1000.0
-        elif rxn.universal_direction == '>':
+        elif rxn.notes['universal_direction'] == '>':
             lower_bound = 0.0
             upper_bound = 1000.0
-        elif rxn.universal_direction == '<':
-            lower_bound = 0.0
-            upper_bound = 1000.0
-            reverse = -1.0
+        elif rxn.notes['universal_direction'] == '<':
+            lower_bound = -1000.0
+            upper_bound = 0.0
         else:
             warn('Reaction direction {0} assumed to be reversible for reaction {1}'
-                 .format(rxn.notes['direction'], rxn.id))
+                 .format(rxn.notes['universal_direction'], rxn.id))
             lower_bound = -1000.0
             upper_bound = 1000.0
         rxn.bounds = (lower_bound, upper_bound)
@@ -202,7 +198,7 @@ def resolve_universal_reactions(reactions, metabolites, validate=False, verbose=
                 model_metabolite.id = '{0}_{1}'.format(fields[1], fields[2])
                 model_metabolite.compartment = fields[2]
                 metabolites.append(model_metabolite)
-            reaction_metabolites[model_metabolite] = float(fields[0]) * reverse
+            reaction_metabolites[model_metabolite] = float(fields[0])
         rxn.add_metabolites(reaction_metabolites)
 
     # If requested, run checks to validate the reactions.
