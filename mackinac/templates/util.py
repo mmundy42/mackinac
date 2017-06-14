@@ -1,7 +1,7 @@
 from warnings import warn
 import re
 
-from cobra.core import DictList
+from cobra.core import DictList, Reaction
 
 
 # Regular expression for compartment suffix on a universal metabolite ID
@@ -206,3 +206,25 @@ def print_role_to_reactions(output):
             data = output[role_id]['reactions'][reaction_id]
             print('    {0} "{1}" from complex {2}'.format(reaction_id, data['name'], data['complex_id']))
     return
+
+
+def create_exchange_reaction(metabolite):
+    """ Create an exchange reaction for a metabolite.
+    
+    Parameters
+    ----------
+    metabolite : cobra.core.Metabolite
+        Metabolite object for metabolite that needs an exchange reaction
+        
+    Returns
+    -------
+    cobra.core.Reaction
+        Exchange reaction for given metabolite
+    """
+
+    rxn = Reaction(id='EX_{0}'.format(metabolite.id),
+                   name='{0} exchange'.format(metabolite.name),
+                   lower_bound=-1000.0,
+                   upper_bound=1000.00)
+    rxn.add_metabolites({metabolite: -1})
+    return rxn
