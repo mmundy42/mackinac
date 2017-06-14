@@ -55,7 +55,7 @@ class TemplateComplex(Object):
     ----------
     _roles : list of dict, optional
         List of roles that trigger the complex
-    reaction_ids : list of str
+    reaction_ids : set of str
         IDs of reactions that are catalyzed by the complex
     """
 

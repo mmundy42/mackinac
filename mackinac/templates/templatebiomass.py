@@ -299,7 +299,7 @@ class TemplateBiomass(Object):
         Parameters
         ----------
         gc_content : float
-            Percent GC content in genome of organism
+            Percent GC content in genome of organism in range from 0.0 to 1.0
 
         Returns
         -------

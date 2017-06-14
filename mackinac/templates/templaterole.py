@@ -53,7 +53,7 @@ class TemplateRole(Object):
         
     Attributes
     ----------
-    complex_ids : set
+    complex_ids : set of str
         IDs of complexes that trigger the role
     ec_numbers : list of str
         EC (Enzyme Commission) numbers from name of role
