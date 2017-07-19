@@ -7,4 +7,4 @@ from .workspace import get_workspace_object_data, get_workspace_object_meta, lis
 from .genome import get_genome_summary, get_genome_features
 from .likelihood import calculate_modelseed_likelihoods, calculate_likelihoods, download_data_files
 from .SeedClient import get_token
-from mackinac import templates
+from . import templates
