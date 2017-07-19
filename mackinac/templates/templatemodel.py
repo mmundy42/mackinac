@@ -18,8 +18,6 @@ from .feature import create_features_from_patric
 # Logger for this module
 LOGGER = logging.getLogger(__name__)
 
-logging.basicConfig(format='%(asctime)s %(message)s', level=logging.DEBUG)
-
 
 class TemplateError(Exception):
     """ Exception raised when there is an error with a template model """
