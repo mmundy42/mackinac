@@ -141,8 +141,25 @@ the notebook from the virtualenv.
 
 6. Now you can run the cells in the notebook.
 
+Acknowledgements
+----------------
+
+The support for template models added in version 0.8.5 is derived from ModelSEED
+and as required by the `ModelSEED license
+<https://github.com/ModelSEED/ProbModelSEED/blob/master/LICENSE.md>`_ note that:
+
+   This product includes software developed by and/or derived from the SEED Project
+   (http://www.theseed.org) to which the U.S. Government retains certain rights.
+
 Release Notes
 -------------
+
+Version 0.8.5 (July xx, 2017)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+* Added support for template models and reconstructing a draft model from the PATRIC
+  genome of an organism.
+
 
 Version 0.8.4 (May 18, 2017)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
