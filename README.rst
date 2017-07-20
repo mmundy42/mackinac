@@ -158,8 +158,8 @@ Version 0.8.5 (July xx, 2017)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 * Added support for template models and reconstructing a draft model from the PATRIC
-  genome of an organism.
-
+  genome of an organism
+* Updates to work better with latest cobra version
 
 Version 0.8.4 (May 18, 2017)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^

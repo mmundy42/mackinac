@@ -398,7 +398,7 @@ def _add_metabolite(modelseed_compound, model, id_type):
     ----------
     modelseed_compound : dict
         Compound dictionary from ModelSEED model
-    model : cobra.Model
+    model : cobra.core.Model
         Model object to add metabolite to
     id_type : {'modelseed', 'bigg'}
         Type of metabolite ID
@@ -450,7 +450,7 @@ def _add_reaction(modelseed_reaction, model, id_type, likelihoods):
     ----------
     modelseed_reaction : dict
         Reaction dictionary from ModelSEED model
-    model : cobra.Model
+    model : cobra.core.Model
         Model object to add reaction to
     id_type : str
         Type of reaction ID
@@ -582,7 +582,7 @@ def create_cobra_model_from_modelseed_model(model_id, id_type='modelseed', valid
 
     Returns
     -------
-    cobra.Model
+    cobra.core.Model
         Model object
     """
 
@@ -728,7 +728,7 @@ def create_universal_model(template_reference, id_type='modelseed'):
 
     Returns
     -------
-    cobra.Model
+    cobra.core.Model
         Model object with all reactions for models of a type of organism
     """
 
@@ -752,6 +752,7 @@ def create_universal_model(template_reference, id_type='modelseed'):
     # Create Metabolite objects for all of the compounds in the template model. Metabolite
     # data is split between the "compcompounds" (compounds in a compartment) and the
     # "compounds" lists.
+    all_metabolites = list()
     for compcompound in data['compcompounds']:
         compound = data['compounds'][compound_index[compcompound['templatecompound_ref']]]
         cobra_id = _convert_suffix(compcompound['id'], id_type)
@@ -760,9 +761,11 @@ def create_universal_model(template_reference, id_type='modelseed'):
                                 name=compound['name'],
                                 charge=compcompound['charge'],
                                 compartment=compcompound['templatecompartment_ref'].split('/')[-1])
-        model.add_metabolites([metabolite])
+        all_metabolites.append(metabolite)
+    model.add_metabolites(all_metabolites)
 
     # Create Reaction objects for all of the reactions in the template model.
+    all_reactions = list()
     for template_reaction in data['reactions']:
         # Set upper and lower bounds based directionality. Switch reverse reactions to
         # forward reactions.
@@ -799,9 +802,10 @@ def create_universal_model(template_reference, id_type='modelseed'):
 
         # Add a note with the ModelSEED reaction type (universal, spontaneous, conditional, or gapfilling).
         reaction.notes['type'] = template_reaction['type']
+        all_reactions.append(reaction)
 
-        # Finally, add the reaction to the model.
-        model.add_reactions([reaction])
+    # Finally, add all of the reactions to the model.
+    model.add_reactions(all_reactions)
 
     return model
 
