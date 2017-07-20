@@ -14,7 +14,7 @@ class TestModelseedBacteroidesThetaiotaomicron:
         assert stats['id'] == b_theta_id
         assert stats['name'] == b_theta_name
         assert stats['num_compartments'] == 2
-        assert stats['num_genes'] == 739
+        assert stats['num_genes'] == 738
         assert stats['num_biomass_compounds'] == 85
         assert stats['source'] == 'PATRIC'
 
@@ -29,14 +29,14 @@ class TestModelseedBacteroidesThetaiotaomicron:
 
     def test_optimize(self, b_theta_id):
         objective = mackinac.optimize_modelseed_model(b_theta_id)
-        assert objective == pytest.approx(175.917)  # Value can change if server changes
+        assert objective == pytest.approx(175.108)  # Value can change if server changes
 
     def test_get_model_stats(self, b_theta_id, b_theta_name):
         stats = mackinac.get_modelseed_model_stats(b_theta_id)
         assert stats['id'] == b_theta_id
         assert stats['name'] == b_theta_name
         assert stats['num_compartments'] == 2
-        assert stats['num_genes'] == 739
+        assert stats['num_genes'] == 738
         assert stats['integrated_gapfills'] == 1
         assert stats['unintegrated_gapfills'] == 0
         assert stats['gapfilled_reactions'] == 95   # Value can change if server changes
