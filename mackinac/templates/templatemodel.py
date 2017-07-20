@@ -473,3 +473,18 @@ class TemplateModel(Object):
                     output[role.id]['reactions'][reaction.id]['name'] = reaction.name
                     output[role.id]['reactions'][reaction.id]['complex_id'] = complx.id
         return output
+
+    def to_model(self):
+        """ Make a model of all metabolites and reactions in template model.
+
+        The returned Model object can be used as a "universal" model for gap filling.
+
+        Returns
+        -------
+        cobra.core.Model
+            Universal model
+        """
+
+        model = Model(self.id, name=self.name)
+        model.add_reactions([rxn.create_model_reaction(self.compartments) for rxn in self.reactions])
+        return model

@@ -12,3 +12,11 @@ class TestTemplateModel:
         btheta = template.reconstruct(summary, features, 'negbio')
         assert len(btheta.reactions) == 984
         assert len(btheta.metabolites) == 1032
+
+    def test_to_model(self):
+        template = mackinac.templates.create_mackinac_template_model('mackinac/data/modelseed/universal',
+                                                                     'mackinac/data/modelseed/bacteria',
+                                                                     'bacteria', 'bacteria')
+        model = template.to_model()
+        assert len(model.reactions) == 20329
+        assert len(model.metabolites) == 15077

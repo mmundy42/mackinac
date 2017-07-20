@@ -97,8 +97,7 @@ def create_universal_reaction(fields, names):
     """
 
     # If reaction is marked as obsolete or there are no metabolites, skip it.
-    # @todo if fields[names['is_obsolete']] == '1' or fields[names['status']] == 'EMPTY':
-    if fields[names['status']] == 'EMPTY':
+    if fields[names['is_obsolete']] == '1' or fields[names['status']] == 'EMPTY':
         return None
 
     # Create a cobra.core.Reaction object. Note that lower bound, upper bound, and
