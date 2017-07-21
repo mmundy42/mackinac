@@ -15,6 +15,7 @@ Welcome to Mackinac's documentation!
    genome
    workspace
    analysis
+   configure
    mackinac
 
 Indices and tables
