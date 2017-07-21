@@ -144,17 +144,47 @@ the notebook from the virtualenv.
 Acknowledgements
 ----------------
 
-The support for template models added in version 0.8.5 is derived from ModelSEED
-and as required by the `ModelSEED license
-<https://github.com/ModelSEED/ProbModelSEED/blob/master/LICENSE.md>`_ note that:
+The support for template models is derived from ModelSEED and as required by the
+`ModelSEED license <https://github.com/ModelSEED/ProbModelSEED/blob/master/LICENSE.md>`_
+note that:
 
    This product includes software developed by and/or derived from the SEED Project
    (http://www.theseed.org) to which the U.S. Government retains certain rights.
 
+One source for the template model data files is the Central Data Model provided by
+"KBase: The U.S. Department of Energy Systems Biology Knowledgebase". As a user,
+you must abide by the following KBase Information and Data Sharing Policy:
+
+   KBase conforms to the Information and Data Sharing Policy of the Genomic Science
+   Program of the Office of Biological and Environmental Research within the Office
+   of Science. This requires that all publishable data, metadata, and software
+   resulting from research funded by the Genomic Science program must conform to
+   community-recognized standard formats when they exist; be clearly attributable;
+   and be deposited within a community-recognized public database(s) appropriate
+   for the research.
+
+   -- www.kbase.us
+
+See `Data Policy and Sources <http://kbase.us/data-policy-and-sources/>`_ for
+additional details.
+
+Another source for the template model data files is the Kyoto Encyclopedia of Genes
+and Genomes (KEGG). Data from KEGG was obtained using the
+`KEGG API <http://www.kegg.jp/kegg/rest/>`_.
+
+Note, there are some limitations on using the KEGG API, most importantly:
+
+    **Restrictions:** KEGG API is provided for academic use by academic users
+    belonging to academic institutions. This service should not be used for bulk
+    data downloads. Please obtain KEGG FTP academic subscription for downloading
+    KEGG data.
+
+    -- www.kegg.jp
+
 Release Notes
 -------------
 
-Version 0.8.5 (July xx, 2017)
+Version 0.8.5 (July 20, 2017)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 * Added support for template models and reconstructing a draft model from the PATRIC
@@ -191,13 +221,15 @@ If you use Mackinac for an analysis, please cite this paper:
 `Mackinac: a bridge between ModelSEED and COBRApy to generate and analyze genome-scale
 metabolic models <https://dx.doi.org/doi:10.1093/bioinformatics/btx185>`_
 
-
 References
 ----------
 
 1. `COBRApy: COnstraints-Based Reconstruction and Analysis for Python <http://dx.doi.org/doi:10.1186/1752-0509-7-74>`_
 2. `High-throughput generation, optimization and analysis of genome-scale metabolic models <http://dx.doi.org/doi:10.1038/nbt.1672>`_ (ModelSEED)
 3. `PATRIC, the bacterial bioinformatics database and analysis resource <http://dx.doi.org/doi:10.1093/nar/gkt1099>`_
+4. `KEGG: Kyoto Encyclopedia of Genes and Genomes <http://www.kegg.jp>`_
+5. `Systems Biology Knowledgebase <http://kbase.us>`_
+
 
 Mackinac Bridge
 ^^^^^^^^^^^^^^^
