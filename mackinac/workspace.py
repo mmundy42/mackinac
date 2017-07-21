@@ -4,12 +4,6 @@ import requests
 
 from .SeedClient import SeedClient, ServerError, handle_server_error
 
-# Workspace service endpoint
-workspace_url = 'https://p3.theseed.org/services/Workspace'
-
-# Client for running functions on Workspace web service.
-ws_client = SeedClient(workspace_url, 'Workspace')
-
 """ Several functions return object metadata which is a tuple with the following fields:
 
      0 : str
@@ -37,6 +31,12 @@ ws_client = SeedClient(workspace_url, 'Workspace')
     11 : str
         When object is stored in Shock, URL to Shock node, otherwise empty string
 """
+
+# Workspace service endpoint
+workspace_url = 'https://p3.theseed.org/services/Workspace'
+
+# Client for running functions on Workspace web service.
+ws_client = SeedClient(workspace_url, 'Workspace')
 
 
 def shock_download(url, token):
