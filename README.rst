@@ -184,6 +184,11 @@ Note, there are some limitations on using the KEGG API, most importantly:
 Release Notes
 -------------
 
+Version 0.8.6 (July XX, 2017)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+* Changed documentation to Read the Docs format and configured build with Sphinx
+
 Version 0.8.5 (July 20, 2017)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
