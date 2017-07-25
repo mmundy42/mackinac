@@ -142,37 +142,6 @@ def calculate_modelseed_likelihoods(model_id, config=default_config):
     # Get the model template object used to build the model.
     template = get_workspace_object_data(stats['template_ref'])
 
-    # Calculate reactions likelihoods and store them with the model.
-    likelihoods = calculate_likelihoods(model_id, genome['features'], template, config=config)
-    reaction_list = list()
-    for reaction_id in sorted(likelihoods['reaction']):
-        value = likelihoods['reaction'][reaction_id]
-        reaction_list.append((reaction_id, value['likelihood'], value['type'], value['complex_string'], value['gpr']))
-    put_workspace_object(join(stats['ref'], 'rxnprobs'), 'rxnprobs',
-                         {'reaction_probabilities': reaction_list}, overwrite=True)
-    return
-
-
-def calculate_likelihoods(model_id, feature_list, template, config=default_config):
-    """ Calculate reaction likelihoods from annotated features of a genome.
-
-    Parameters
-    ----------
-    model_id : str
-        ID of model
-    feature_list : list of dict
-        List of annotated features with ID and amino acid sequence
-    template : dict
-        Model template with lists of roles, complexes, and reactions
-    config : dict, optional
-        Dictionary of configuration variables
-
-    Returns
-    -------
-    dict
-        Dictionary of calculated likelihoods and statistics
-    """
-
     # If needed, create folder for intermediate files.
     if not exists(config['work_folder']):
         makedirs(config['work_folder'])
@@ -237,7 +206,7 @@ def calculate_likelihoods(model_id, feature_list, template, config=default_confi
     }
 
     # Run the probabilistic annotation algorithm to calculate reaction likelihoods.
-    likelihoods = _calculate_roleset_likelihoods(likelihoods, model_id, feature_list, target_rolesets, config)
+    likelihoods = _calculate_roleset_likelihoods(likelihoods, model_id, genome['features'], target_rolesets, config)
     likelihoods = _calculate_role_likelihoods(likelihoods, config)
     likelihoods = _calculate_total_role_likelihoods(likelihoods, config)
     likelihoods = _calculate_complex_likelihoods(likelihoods, complexes_to_roles, target_rolesets, config)
@@ -247,6 +216,13 @@ def calculate_likelihoods(model_id, feature_list, template, config=default_confi
     if config['debug']:
         _save_data(model_id, likelihoods, config)
 
+    # Store reaction likelihoods with the model.
+    reaction_list = list()
+    for reaction_id in sorted(likelihoods['reaction']):
+        value = likelihoods['reaction'][reaction_id]
+        reaction_list.append((reaction_id, value['likelihood'], value['type'], value['complex_string'], value['gpr']))
+    put_workspace_object(join(stats['ref'], 'rxnprobs'), 'rxnprobs',
+                         {'reaction_probabilities': reaction_list}, overwrite=True)
     return likelihoods
 
 
