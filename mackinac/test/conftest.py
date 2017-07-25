@@ -1,5 +1,6 @@
 import pytest
 import os
+from os.path import expanduser, join
 
 import mackinac
 
@@ -32,3 +33,18 @@ def b_theta_id():
 @pytest.fixture(scope='session')
 def b_theta_name():
     return 'Bacteroides thetaiotaomicron VPI-5482'
+
+
+@pytest.fixture(scope='session')
+def data_folder():
+    return join(expanduser('~'), 'mackinac_data')
+
+
+@pytest.fixture(scope='session')
+def work_folder():
+    return join(expanduser('~'), 'mackinac_work')
+
+
+@pytest.fixture(scope='session')
+def search_program_path():
+    return join(expanduser('~'), 'Applications', 'usearch')
