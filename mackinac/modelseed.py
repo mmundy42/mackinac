@@ -69,6 +69,9 @@ def delete_modelseed_model(model_id):
 def gapfill_modelseed_model(model_id, media_reference=None, likelihood=False, comprehensive=False, solver=None):
     """ Run gap fill on a ModelSEED model.
 
+    The ModelSEED model is updated with the reactions identified by gap fill that
+    make the model feasible.
+
     Parameters
     ----------
     model_id : str
@@ -174,13 +177,15 @@ def get_modelseed_fba_solutions(model_id):
     return solutions
 
 
-def get_modelseed_gapfill_solutions(model_id):
+def get_modelseed_gapfill_solutions(model_id, id_type='modelseed'):
     """ Get the list of gap fill solutions for a ModelSEED model.
 
     Parameters
     ----------
     model_id : str
         ID of model
+    id_type : {'modelseed', 'bigg'}
+        Type of IDs ('modelseed' for _c or 'bigg' for '[c])
 
     Returns
     -------
@@ -204,6 +209,7 @@ def get_modelseed_gapfill_solutions(model_id):
         sol['reactions'] = dict()
         if len(sol['solution_reactions']) > 0:  # A gap fill solution can have no reactions
             for reaction in sol['solution_reactions'][0]:
+                reaction['compartment'] = _convert_compartment(reaction['compartment'], id_type)
                 reaction_id = '{0}_{1}'.format(re.sub(modelseed_suffix_re, '', reaction['reaction'].split('/')[-1]),
                                                reaction['compartment'])
                 sol['reactions'][reaction_id] = reaction
