@@ -681,10 +681,10 @@ def create_cobra_model_from_modelseed_model(model_id, id_type='modelseed', valid
     model.add_reactions(exchange_list)
     LOGGER.info('Finished adding %d exchange reactions to model', len(exchange_list))
 
-    # A ModelSEED model must have an exchange reaction for the special biomass metabolite.
+    # A ModelSEED model must have a sink reaction for the special biomass metabolite.
     metabolite = model.metabolites.get_by_id('cpd11416'+cytosol_suffix)
-    reaction = Reaction(id='EX_' + metabolite.id,
-                        name=metabolite.name,
+    reaction = Reaction(id='SK_' + metabolite.id,
+                        name=metabolite.name + ' sink',
                         lower_bound=-1000.0,
                         upper_bound=1000.0)
     reaction.add_metabolites({metabolite: -1.0})
@@ -736,11 +736,13 @@ def create_cobra_model_from_modelseed_model(model_id, id_type='modelseed', valid
     if validate:
         validate_model(model)
 
+    LOGGER.info('Created %s model with %d reactions, %d metabolites, %d compartments',
+                model.id, len(model.reactions), len(model.metabolites), len(model.compartments))
     return model
 
 
 def validate_model(model):
-    """ Validate a model by checking for common things.
+    """ Validate a model by checking for common issues.
 
     Parameters
     ----------
@@ -748,21 +750,37 @@ def validate_model(model):
         Model to validate
     """
 
-    # See if all of the reactions are mass balanced.
+    # See if all of the non-boundary reactions are mass balanced.
     num_unbalanced = 0
-    for r in model.reactions:
-        if not r.id.startswith('EX_'):  # Skip exchange reactions
-            unbalanced = r.check_mass_balance()
-            if len(unbalanced) > 0:
-                warn('Reaction {0} is unbalanced because {1}\n    {2}'
-                     .format(r.id, unbalanced, r.build_reaction_string(use_metabolite_names=True)))
-                num_unbalanced += 1
+    reaction_list = model.reactions.query(lambda x: not x, 'boundary')
+    for reaction in reaction_list:
+        unbalanced = reaction.check_mass_balance()
+        if len(unbalanced) > 0:
+            warn('Reaction {0} is unbalanced because {1}\n    {2}'
+                 .format(reaction.id, unbalanced, reaction.build_reaction_string(use_metabolite_names=True)))
+            num_unbalanced += 1
     if num_unbalanced > 0:
         warn('Model {0} has {1} unbalanced reactions'.format(model.id, num_unbalanced))
 
-    # See if there is a way for all boundary metabolites to make it into the cell.
-    # exchange_reactions = model.reactions.query(lambda x: x.startswith('EX_'), 'id')
-    # Get the metabolite from the exchange reaction, find the transport reaction.
+    # See if there is a way for exchange reaction metabolites to make it into the cell.
+    # Note these assumptions: (1) exchange reaction IDs start with 'EX_' (2) cytosol
+    # compartment ID is 'c' (3) extracellular compartment ID is 'e' (4) exchange
+    # reactions are defined with a single reactant.
+    exchange_reactions = model.reactions.query(lambda x: x.startswith('EX_'), 'id')
+    for reaction in exchange_reactions:
+        num_transport = 0
+        rxn_list = reaction.reactants[0].reactions
+        for rxn in rxn_list:
+            if 'c' in rxn.compartments and 'e' in rxn.compartments:
+                num_transport += 1
+        if num_transport == 0:
+            warn('There are no transport reactions for boundary metabolite {0}'
+                 .format(reaction.reactants[0].id))
+        if num_transport > 1:
+            LOGGER.info('There are %d transport reactions for boundary metabolite %s',
+                        num_transport, reaction.reactants[0].id)
+
+    return
 
 
 def create_universal_model(template_reference, id_type='modelseed'):
