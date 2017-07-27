@@ -6,7 +6,7 @@ from os.path import join
 import re
 import logging
 
-from cobra import Model, Reaction, Metabolite, Gene
+from cobra import Model, Reaction, Metabolite, Gene, DictList
 
 from .SeedClient import SeedClient, ServerError, ObjectNotFoundError, JobError, handle_server_error
 from .workspace import get_workspace_object_meta, get_workspace_object_data, put_workspace_object
@@ -221,7 +221,7 @@ def get_modelseed_gapfill_solutions(model_id, id_type='modelseed'):
         sol['reactions'] = dict()
         if len(sol['solution_reactions']) > 0:  # A gap fill solution can have no reactions
             for reaction in sol['solution_reactions'][0]:
-                reaction['compartment'] = _convert_compartment(reaction['compartment'], id_type)
+                reaction['compartment'] = _convert_compartment_id(reaction['compartment'], id_type)
                 reaction_id = '{0}_{1}'.format(re.sub(modelseed_suffix_re, '', reaction['reaction'].split('/')[-1]),
                                                reaction['compartment'])
                 sol['reactions'][reaction_id] = reaction
@@ -340,7 +340,7 @@ def list_modelseed_models(base_folder=None, sort_key='rundate', print_output=Fal
     return None
 
 
-def _convert_compartment(modelseed_id, format_type):
+def _convert_compartment_id(modelseed_id, format_type):
     """ Convert a compartment ID in ModelSEED source format to another format.
 
         No conversion is done for unknown format types.
@@ -415,56 +415,34 @@ def _remove_suffix(modelseed_string):
     return re.sub(modelseed_suffix_re, '', modelseed_string)
 
 
-def _add_metabolite(modelseed_compound, model, id_type):
-    """ Create a COBRApy Metabolite object from a ModelSEED compound dictionary and add it to COBRApy model.
+def _convert_metabolite(modelseed_compound, id_type):
+    """ Convert a ModelSEED compound dictionary to a COBRApy metabolite object.
 
     Parameters
     ----------
     modelseed_compound : dict
         Compound dictionary from ModelSEED model
-    model : cobra.core.Model
-        Model object to add metabolite to
     id_type : {'modelseed', 'bigg'}
         Type of metabolite ID
 
     Returns
     -------
-    bool
-        True when metabolite is a duplicate
+    cobra.core.Metabolite
+        Metabolite object created from ModelSEED compound
     """
 
-    # Convert from ModelSEED format to COBRApy format.
+    # Convert ID and name from ModelSEED format to COBRApy format.
     cobra_id = _convert_suffix(modelseed_compound['id'], id_type)
-    cobra_compartment = _convert_compartment(modelseed_compound['modelcompartment_ref'].split('/')[-1], id_type)
+    cobra_compartment = _convert_compartment_id(modelseed_compound['modelcompartment_ref'].split('/')[-1], id_type)
     cobra_name = _remove_suffix(modelseed_compound['name'])
 
-    # A ModelSEED model usually contains duplicate compounds. Confirm that the duplicate
-    # compound is an exact duplicate and ignore it.
-    if model.metabolites.has_id(cobra_id):
-        metabolite = model.metabolites.get_by_id(cobra_id)
-        if metabolite.name != cobra_name:
-            warn('Duplicate ModelSEED compound ID {0} has different name, {1} != {2}'
-                 .format(cobra_id, metabolite.name, cobra_name))
-        if metabolite.formula != modelseed_compound['formula']:
-            warn('Duplicate ModelSEED compound ID {0} has different formula, {1} != {2}'
-                 .format(cobra_id, metabolite.formula, modelseed_compound['formula']))
-        if metabolite.charge != modelseed_compound['charge']:
-            warn('Duplicate ModelSEED compound ID {0} has different charge {1} != {2}'
-                 .format(cobra_id, metabolite.charge, modelseed_compound['charge']))
-        if metabolite.compartment != cobra_compartment:
-            warn('Duplicate ModelSEED compound ID {0} has different compartment {1} != {2}'
-                 .format(cobra_id, metabolite.compartment, cobra_compartment))
-        return True
-
-    # Create the Metabolite object and add it to the model.
+    # Create the Metabolite object.
     metabolite = Metabolite(id=cobra_id,
                             formula=modelseed_compound['formula'],
                             name=cobra_name,
                             charge=modelseed_compound['charge'],
                             compartment=cobra_compartment)
-    model.add_metabolites([metabolite])
-
-    return False
+    return metabolite
 
 
 def _add_reaction(modelseed_reaction, model, id_type, likelihoods):
@@ -636,15 +614,37 @@ def create_cobra_model_from_modelseed_model(model_id, id_type='modelseed', valid
     # Add compartments to the COBRApy model.
     for index in range(len(data['modelcompartments'])):
         modelseed_compartment = data['modelcompartments'][index]
-        cobra_id = _convert_compartment(modelseed_compartment['id'], id_type)
+        cobra_id = _convert_compartment_id(modelseed_compartment['id'], id_type)
         model.compartments[cobra_id] = modelseed_compartment['label'][:-2]  # Strip _0 suffix from label
 
     # Create Metabolite objects for all of the compounds in the ModelSEED model.
+    LOGGER.info('Started adding %d metabolites from ModelSEED model', len(data['modelcompounds']))
     num_duplicates = 0
+    metabolite_list = DictList()
     for index in range(len(data['modelcompounds'])):
-        duplicate = _add_metabolite(data['modelcompounds'][index], model, id_type=id_type)
-        if duplicate:
+        metabolite = _convert_metabolite(data['modelcompounds'][index], id_type=id_type)
+        try:
+            metabolite_list.append(metabolite)
+        except ValueError:
+            # A ModelSEED model can contain duplicate compounds. Confirm that
+            # the duplicate compound is an exact duplicate and ignore it.
+            duplicate = metabolite_list.get_by_id(metabolite.id)
+            if metabolite.name != duplicate.name:
+                LOGGER.warning('Duplicate ModelSEED compound ID {0} has different name, {1} != {2}'
+                               .format(metabolite.id, metabolite.name, duplicate.name))
+            if metabolite.formula != duplicate.formula:
+                LOGGER.warning('Duplicate ModelSEED compound ID {0} has different formula, {1} != {2}'
+                               .format(metabolite.id, metabolite.formula, duplicate.formula))
+            if metabolite.charge != duplicate.charge:
+                LOGGER.warning('Duplicate ModelSEED compound ID {0} has different charge {1} != {2}'
+                               .format(metabolite.id, metabolite.charge, duplicate.charge))
+            if metabolite.compartment != duplicate.compartment:
+                LOGGER.warning('Duplicate ModelSEED compound ID {0} has different compartment {1} != {2}'
+                               .format(metabolite.id, metabolite.compartment, duplicate.compartment))
             num_duplicates += 1
+    model.add_metabolites(metabolite_list)
+    LOGGER.info('Finished adding %d metabolites to model, found %d duplicate metabolites',
+                len(metabolite_list), num_duplicates)
 
     # Report the number of duplicate metabolites.
     if validate and num_duplicates > 0:
