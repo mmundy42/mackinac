@@ -1,6 +1,7 @@
 from operator import itemgetter
 import json
 import requests
+import logging
 
 from .SeedClient import SeedClient, ServerError, handle_server_error
 
@@ -37,6 +38,9 @@ workspace_url = 'https://p3.theseed.org/services/Workspace'
 
 # Client for running functions on Workspace web service.
 ws_client = SeedClient(workspace_url, 'Workspace')
+
+# Logger for this module
+LOGGER = logging.getLogger(__name__)
 
 
 def shock_download(url, token):
@@ -78,7 +82,9 @@ def get_workspace_object_meta(reference):
     try:
         # The output from get() is a list of tuples.  When asking for metadata only,
         # the list entry is a tuple with only one element.
+        LOGGER.info('Started get object metadata using web service for "%s"', reference)
         metadata_list = ws_client.call('get', {'objects': [reference], 'metadata_only': 1})
+        LOGGER.info('Finished get object metadata using web service for "%s"', reference)
         return metadata_list[0][0]
     except ServerError as e:
         handle_server_error(e, [reference])
@@ -100,6 +106,7 @@ def get_workspace_object_data(reference, json_data=True):
         Object data (can be dict, list, or string)
     """
 
+    LOGGER.info('Started get object data using web service for "%s"', reference)
     data = None
     try:
         # The output from get() is a list of tuples. The first element in the
@@ -113,6 +120,7 @@ def get_workspace_object_data(reference, json_data=True):
             data = object_list[0][1]
     except Exception as e:
         handle_server_error(e, [reference])
+    LOGGER.info('Finished get object data using web service for "%s"', reference)
 
     if json_data:
         return json.loads(data)
@@ -140,10 +148,12 @@ def list_workspace_objects(folder, sort_key='folder', recursive=True, print_outp
     """
 
     # Get the list of objects in the specified folder.
+    LOGGER.info('Started list objects using web service for folder "%s"', folder)
     try:
         output = ws_client.call('ls', {'paths': [folder], 'recursive': recursive})
     except ServerError as e:
         handle_server_error(e, [folder])
+    LOGGER.info('Finished list objects using web service for folder "%s"', folder)
 
     # See if the folder is in the returned data.
     if folder not in output:
@@ -223,7 +233,9 @@ def put_workspace_object(reference, object_type, data=None, metadata=None, shock
     if shock:
         params['createUploadNodes'] = 1
     try:
+        LOGGER.info('Started put object data using web service for "%s"', reference)
         output = ws_client.call('create', params)
+        LOGGER.info('Finished put object data using web service for "%s"', reference)
         return output[0]
     except ServerError as e:
         handle_server_error(e, [reference])
@@ -251,7 +263,9 @@ def delete_workspace_object(reference, force=False):
         params['deleteDirectories'] = 1
         params['force'] = 1
     try:
+        LOGGER.info('Started delete object using web service for "%s"', reference)
         output = ws_client.call('delete', params)
+        LOGGER.info('Finished delete object using web service for "%s"', reference)
         return output[0]
     except ServerError as e:
         handle_server_error(e, [reference])
