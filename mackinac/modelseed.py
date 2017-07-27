@@ -4,6 +4,7 @@ from operator import itemgetter
 from warnings import warn
 from os.path import join
 import re
+import logging
 
 from cobra import Model, Reaction, Metabolite, Gene
 
@@ -27,6 +28,9 @@ patric_gene_prefix_re = re.compile(r'^fig\|')
 
 # Name of folder where ModelSEED models are stored
 model_folder = 'modelseed'
+
+# Logger for this module
+LOGGER = logging.getLogger(__name__)
 
 
 def _make_modelseed_reference(name):
@@ -58,10 +62,12 @@ def delete_modelseed_model(model_id):
     """
 
     reference = _make_modelseed_reference(model_id)
+    LOGGER.info('Started delete model using web service for "%s"', reference)
     try:
         ms_client.call('delete_model', {'model': reference})
     except ServerError as e:
         handle_server_error(e, [reference])
+    LOGGER.info('Finished delete model using web service for "%s"', reference)
 
     return
 
@@ -106,8 +112,10 @@ def gapfill_modelseed_model(model_id, media_reference=None, likelihood=False, co
     if solver is not None:
         params['solver'] = solver
 
+    LOGGER.info('Started gapfill model using web service for "%s"', reference)
     try:
         job_id = ms_client.call('GapfillModel', params)
+        LOGGER.info('Started job %s to run gapfill model for "%s"', job_id, reference)
         _wait_for_job(job_id)
     except ServerError as e:
         references = [reference]
@@ -133,12 +141,14 @@ def get_modelseed_fba_solutions(model_id):
     """
 
     reference = _make_modelseed_reference(model_id)
+    LOGGER.info('Started get fba solutions using web service for "%s"', reference)
     try:
         get_modelseed_model_stats(model_id)  # Confirm model exists
         solutions = ms_client.call('list_fba_studies', {'model': reference})
     except ServerError as e:
         handle_server_error(e, [reference])
         return
+    LOGGER.info('Finished get fba solutions using web service for "%s"', reference)
 
     # For each solution in the list, get the referenced fba object, and add the
     # details on the flux values to the solution. Note ModelSEED stores the
@@ -194,11 +204,13 @@ def get_modelseed_gapfill_solutions(model_id, id_type='modelseed'):
     """
 
     reference = _make_modelseed_reference(model_id)
+    LOGGER.info('Started get gapfill solutions using web service for "%s"', reference)
     try:
         get_modelseed_model_stats(model_id)  # Confirm model exists
         solutions = ms_client.call('list_gapfill_solutions', {'model': reference})
     except ServerError as e:
         handle_server_error(e, [reference])
+    LOGGER.info('Finished get gapfill solutions using web service for "%s"', reference)
 
     # Convert the data about the gap filled reactions from a list to a dictionary
     # keyed by reaction ID.
@@ -235,6 +247,7 @@ def get_modelseed_model_data(model_id):
     """
 
     reference = _make_modelseed_reference(model_id)
+    LOGGER.info('Started get model data using web service for "%s"', reference)
     try:
         return ms_client.call('get_model', {'model': reference, 'to': 1})
     except ServerError as e:
@@ -256,7 +269,9 @@ def get_modelseed_model_stats(model_id):
     """
 
     # The metadata for the model object has the data needed for the dictionary.
-    metadata = get_workspace_object_meta(_make_modelseed_reference(model_id))
+    reference = _make_modelseed_reference(model_id)
+    LOGGER.info('Started get model stats using web service for "%s"', reference)
+    metadata = get_workspace_object_meta(reference)
 
     # Build the model statistics dictionary.
     stats = dict()
@@ -280,6 +295,7 @@ def get_modelseed_model_stats(model_id):
     stats['template_ref'] = metadata[7]['template_ref']
     stats['type'] = metadata[7]['type']
     stats['unintegrated_gapfills'] = int(metadata[7]['unintegrated_gapfills'])
+    LOGGER.info('Finished get model stats using web service for "%s"', reference)
 
     return stats
 
@@ -306,10 +322,12 @@ def list_modelseed_models(base_folder=None, sort_key='rundate', print_output=Fal
     if base_folder is not None:
         params['path'] = base_folder
 
+    LOGGER.info('Started list models using web service')
     try:
         output = ms_client.call('list_models', params)
     except ServerError as e:
         handle_server_error(e)
+    LOGGER.info('Finished list models using web service')
     reverse = False
     if sort_key == 'rundate':
         reverse = True
@@ -702,19 +720,27 @@ def create_cobra_model_from_modelseed_model(model_id, id_type='modelseed', valid
 
     # If requested, validate the COBRApy model.
     if validate:
-        # See if all of the reactions are mass balanced.
-        num_unbalanced = 0
-        for r in model.reactions:
-            if not r.id.startswith('EX_'):  # Skip exchange reactions
-                unbalanced = r.check_mass_balance()
-                if len(unbalanced) > 0:
-                    warn('Reaction {0} is unbalanced because {1}\n    {2}'
-                         .format(r.id, unbalanced, r.build_reaction_string(use_metabolite_names=True)))
-                    num_unbalanced += 1
-        if num_unbalanced > 0:
-            warn('Model {0} has {1} unbalanced reactions'.format(model.id, num_unbalanced))
+        validate_model(model)
 
     return model
+
+
+def validate_model(model):
+    # See if all of the reactions are mass balanced.
+    num_unbalanced = 0
+    for r in model.reactions:
+        if not r.id.startswith('EX_'):  # Skip exchange reactions
+            unbalanced = r.check_mass_balance()
+            if len(unbalanced) > 0:
+                warn('Reaction {0} is unbalanced because {1}\n    {2}'
+                     .format(r.id, unbalanced, r.build_reaction_string(use_metabolite_names=True)))
+                num_unbalanced += 1
+    if num_unbalanced > 0:
+        warn('Model {0} has {1} unbalanced reactions'.format(model.id, num_unbalanced))
+
+    # See if there is a way for all boundary metabolites to make it into the cell.
+    # exchange_reactions = model.reactions.query(lambda x: x.startswith('EX_'), 'id')
+    # Get the metabolite from the exchange reaction, find the transport reaction.
 
 
 def create_universal_model(template_reference, id_type='modelseed'):
@@ -845,8 +871,10 @@ def optimize_modelseed_model(model_id, media_reference=None):
         params['media'] = media_reference
 
     # Run the server method.
+    LOGGER.info('Started flux balance analysis using web service for "%s"', reference)
     try:
         job_id = ms_client.call('FluxBalanceAnalysis', params)
+        LOGGER.info('Started job %s to run flux balance analysis for "%s"', job_id, reference)
         _wait_for_job(job_id)
     except ServerError as e:
         references = [reference]
@@ -918,8 +946,10 @@ def reconstruct_modelseed_model(genome_id, source='patric', template_reference=N
         get_workspace_object_meta(folder_reference)
     except ObjectNotFoundError:
         put_workspace_object(folder_reference, 'folder')
+        LOGGER.info('Created modelseed folder in workspace for "%s"', ms_client.username)
 
     # Run the server method.
+    LOGGER.info('Started model reconstruction using web service for "%s"', params['genome'])
     try:
         job_id = ms_client.call('ModelReconstruction', params)
     except ServerError as e:
@@ -927,6 +957,7 @@ def reconstruct_modelseed_model(genome_id, source='patric', template_reference=N
         if template_reference is not None:
             references = [template_reference]
         handle_server_error(e, references)
+    LOGGER.info('Started job %s to run model reconstruction for "%s"', job_id, params['genome'])
 
     # The task structure has the workspace where the model is stored but not the name of the model.
     _wait_for_job(job_id)
@@ -938,12 +969,12 @@ def reconstruct_modelseed_model(genome_id, source='patric', template_reference=N
     return stats
 
 
-def _wait_for_job(jobid):
+def _wait_for_job(job_id):
     """ Wait for a job submitted to the ModelSEED app service to end.
 
     Parameters
     ----------
-    jobid : str
+    job_id : str
         ID of submitted job
 
     Returns
@@ -957,20 +988,22 @@ def _wait_for_job(jobid):
         When a job with the specified ID was not found
     """
 
+    LOGGER.info('Started to wait for job %s', job_id)
     task = None
     done = False
     while not done:
         jobs = ms_client.call('CheckJobs', {})
-        if jobid in jobs:
-            task = jobs[jobid]
+        if job_id in jobs:
+            task = jobs[job_id]
             if task['status'] == 'failed':
                 if 'error' in task:
                     raise ServerError(task['error'])
                 raise ServerError('Job submitted to ModelSEED app service failed, no details provided in response')
             elif task['status'] == 'completed':
+                LOGGER.info('Job %s completed successfully', job_id)
                 done = True
             else:
                 sleep(3)
         else:
-            raise JobError('Job {0} was not found'.format(jobid))
+            raise JobError('Job {0} was not found'.format(job_id))
     return task
