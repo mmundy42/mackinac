@@ -665,17 +665,21 @@ def create_cobra_model_from_modelseed_model(model_id, id_type='modelseed', valid
     LOGGER.info('Finished adding %d reactions to model', len(model.reactions))
 
     # Add exchange reactions for metabolites in extracellular compartment.
-    for index in range(len(model.metabolites)):
-        metabolite = model.metabolites[index]
-        if metabolite.compartment.startswith('e'):
-            # Single reactant metabolite makes a system boundary reaction.
-            reaction = Reaction(id='EX_' + metabolite.id,
-                                name=metabolite.name + ' exchange',
-                                lower_bound=-1000.0,
-                                upper_bound=1000.0)
-            reaction.add_metabolites({metabolite: -1.0})
-            reaction.notes['likelihood_str'] = 'n/a'
-            model.add_reactions([reaction])
+    exchange_list = DictList()
+    extracellular_metabolites = model.metabolites.query(lambda x: x == 'e', 'compartment')
+    LOGGER.info('Started adding %d exchange reactions for extracellular metabolites',
+                len(extracellular_metabolites))
+    for metabolite in extracellular_metabolites:
+        # Single reactant metabolite makes a system boundary reaction.
+        reaction = Reaction(id='EX_' + metabolite.id,
+                            name=metabolite.name + ' exchange',
+                            lower_bound=-1000.0,
+                            upper_bound=1000.0)
+        reaction.add_metabolites({metabolite: -1.0})
+        reaction.notes['likelihood_str'] = 'unknown'
+        exchange_list.append(reaction)
+    model.add_reactions(exchange_list)
+    LOGGER.info('Finished adding %d exchange reactions to model', len(exchange_list))
 
     # A ModelSEED model must have an exchange reaction for the special biomass metabolite.
     metabolite = model.metabolites.get_by_id('cpd11416'+cytosol_suffix)
@@ -706,8 +710,9 @@ def create_cobra_model_from_modelseed_model(model_id, id_type='modelseed', valid
     # reaction.add_metabolites({metabolite: -1.0})
     # model.add_reactions([reaction])
 
-    # Add the biomass reactions to the COBRApy model. ModelSEED models can have more than one biomass reaction
-    # but the model does not identify which one to use as the objective so always use the first one.
+    # Add the biomass reactions to the COBRApy model. ModelSEED models can have more
+    # than one biomass reaction but the model does not identify which one to use as
+    # the objective so always use the first one.
     if len(data['biomasses']) > 1:
         warn('Found {0} biomass reactions and selected {1} as the objective'
              .format(len(data['biomasses']), data['biomasses'][0]['id']))
@@ -735,6 +740,14 @@ def create_cobra_model_from_modelseed_model(model_id, id_type='modelseed', valid
 
 
 def validate_model(model):
+    """ Validate a model by checking for common things.
+
+    Parameters
+    ----------
+    model : cobra.core.Model
+        Model to validate
+    """
+
     # See if all of the reactions are mass balanced.
     num_unbalanced = 0
     for r in model.reactions:
