@@ -416,7 +416,7 @@ def _remove_suffix(modelseed_string):
 
 
 def _convert_metabolite(modelseed_compound, id_type):
-    """ Convert a ModelSEED compound dictionary to a COBRApy metabolite object.
+    """ Convert a ModelSEED compound dictionary to a COBRApy Metabolite object.
 
     Parameters
     ----------
@@ -445,23 +445,28 @@ def _convert_metabolite(modelseed_compound, id_type):
     return metabolite
 
 
-def _add_reaction(modelseed_reaction, model, id_type, likelihoods):
-    """ Create a COBRApy Reaction object from a ModelSEED reaction dictionary and add it to COBRApy model.
+def _convert_reaction(modelseed_reaction, model, id_type, likelihoods):
+    """ Convert a ModelSEED reaction dictionary to a COBRApy Reaction object.
 
     Parameters
     ----------
     modelseed_reaction : dict
         Reaction dictionary from ModelSEED model
     model : cobra.core.Model
-        Model object to add reaction to
-    id_type : str
+        Model object with metabolites
+    id_type : {'modelseed', 'bigg'}
         Type of reaction ID
     likelihoods : dict
         Dictionary with reaction likelihoods from ModelSEED model
+
+    Returns
+    -------
+    cobra.core.Reaction
+        Reaction object created from ModelSEED compound
     """
 
-    # Set upper and lower bounds based directionality. Switch reverse reactions to forward reactions (ModelSEED
-    # does this when exporting to SBML).
+    # Set upper and lower bounds based directionality. Switch reverse reactions to
+    # forward reactions (ModelSEED does this when exporting to SBML).
     reverse = 1.0
     if modelseed_reaction['direction'] == '=':
         lower_bound = -1000.0
@@ -551,9 +556,10 @@ def _add_reaction(modelseed_reaction, model, id_type, likelihoods):
 
             reaction.gene_reaction_rule = gpr_rule
 
-    # Add a note with gap fill details. ModelSEED gap fill data is a dictionary where the key is the
-    # gap fill solution ID and the value indicates if the reaction was added or reversed and the
-    # direction of the reaction. For example: {u'gf.0': u'added:>'}
+    # Add a note with gap fill details. ModelSEED gap fill data is a dictionary
+    # where the key is the gap fill solution ID and the value indicates if the
+    # reaction was added or reversed and the direction of the reaction. For
+    # example: {u'gf.0': u'added:>'}
     if len(modelseed_reaction['gapfill_data']) > 0:
         reaction.notes['gapfill_data'] = modelseed_reaction['gapfill_data']
 
@@ -564,10 +570,7 @@ def _add_reaction(modelseed_reaction, model, id_type, likelihoods):
     else:
         reaction.notes['likelihood_str'] = 'unknown'
 
-    # Finally, add the reaction to the model.
-    model.add_reactions([reaction])
-
-    return
+    return reaction
 
 
 def create_cobra_model_from_modelseed_model(model_id, id_type='modelseed', validate=False):
@@ -612,12 +615,14 @@ def create_cobra_model_from_modelseed_model(model_id, id_type='modelseed', valid
     model = Model(data['id'], name=data['name'])
 
     # Add compartments to the COBRApy model.
+    LOGGER.info('Started adding %d compartments from ModelSEED model', len(data['modelcompartments']))
     for index in range(len(data['modelcompartments'])):
         modelseed_compartment = data['modelcompartments'][index]
         cobra_id = _convert_compartment_id(modelseed_compartment['id'], id_type)
         model.compartments[cobra_id] = modelseed_compartment['label'][:-2]  # Strip _0 suffix from label
+    LOGGER.info('Finished adding %d compartments to model', len(model.compartments))
 
-    # Create Metabolite objects for all of the compounds in the ModelSEED model.
+    # Add all of the metabolites (or compounds) to the COBRApy model.
     LOGGER.info('Started adding %d metabolites from ModelSEED model', len(data['modelcompounds']))
     num_duplicates = 0
     metabolite_list = DictList()
@@ -644,7 +649,7 @@ def create_cobra_model_from_modelseed_model(model_id, id_type='modelseed', valid
             num_duplicates += 1
     model.add_metabolites(metabolite_list)
     LOGGER.info('Finished adding %d metabolites to model, found %d duplicate metabolites',
-                len(metabolite_list), num_duplicates)
+                len(model.metabolites), num_duplicates)
 
     # Report the number of duplicate metabolites.
     if validate and num_duplicates > 0:
@@ -652,8 +657,12 @@ def create_cobra_model_from_modelseed_model(model_id, id_type='modelseed', valid
              .format(num_duplicates, model.id, model.name))
 
     # Add all of the reactions to the COBRApy model.
+    LOGGER.info('Started adding %d reactions from ModelSEED model', len(data['modelreactions']))
+    reaction_list = DictList()
     for index in range(len(data['modelreactions'])):
-        _add_reaction(data['modelreactions'][index], model, id_type, likelihoods)
+        reaction_list.append(_convert_reaction(data['modelreactions'][index], model, id_type, likelihoods))
+    model.add_reactions(reaction_list)
+    LOGGER.info('Finished adding %d reactions to model', len(model.reactions))
 
     # Add exchange reactions for metabolites in extracellular compartment.
     for index in range(len(model.metabolites)):
