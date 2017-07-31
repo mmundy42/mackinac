@@ -127,7 +127,10 @@ def create_features_from_patric(genome_features):
     Parameters
     ----------
     genome_features : list of dict
-        List of genome features where each entry is a dict with keys that vary based on available data
+        List of genome features where each entry is a dict with keys that vary
+        based on available data. To create Feature objects from the genome annotation
+        the 'patric_id' key is used for the feature ID parameter and the 'product'
+        key is used for the function parameter. All other keys are ignored.
         
     Returns
     -------
