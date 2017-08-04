@@ -3,6 +3,8 @@ from os import makedirs, remove
 from warnings import warn
 from math import log10, isnan
 import subprocess
+from collections import defaultdict
+import logging
 
 from .workspace import get_workspace_object_data
 
@@ -15,14 +17,22 @@ protein_sequence_file_name = 'protein.fasta'
 # Name of feature ID to role ID mapping file
 fid_role_file_name = 'otu_fid_role.tsv'
 
+# Logger for this module
+LOGGER = logging.getLogger(__name__)
+
 
 class LikelihoodError(Exception):
     """ Exception raised when there is a problem calculating likelihoods. """
     pass
 
 
-class Likelihood(object):
-    """ Likelihoods.
+class LikelihoodAnnotation(object):
+    """ Likelihood-based gene annotation for a genome.
+
+    This class implements the algorithm described in "Likelihood-Based Gene
+    Annotations for Gap Filling and Quality Assessment in Genome-Scale Metabolic
+    Models". Private methods implement the calculations described by the equations
+    in the Methods section of the paper.
 
     Parameters
     ----------
@@ -37,8 +47,6 @@ class Likelihood(object):
 
     Attributes
     ----------
-    search_program_name : {'usearch', 'blastp'}
-        Name of search program
     search_program_threads : int
         Number of threads search program can use (more makes search faster)
     search_program_evalue : float
@@ -46,46 +54,57 @@ class Likelihood(object):
     search_program_accel : float
         Value for search program accel parameter (speed vs. sensitivity)
     pseudo_count : float
-        Value used to dilute the likelihoods of annotations that have weak homology to the query
+        Value used to dilute the likelihoods of annotations that have weak homology
+         to the query
     separator : str
         Character string not found in any roles and used to split lists of strings
-    dilution_percent : float
-        Percentage of the maximum likelihood to use as a threshold to consider other genes as
-        having a particular function aside from the one with greatest likelihood
+    _dilution_percent : float
+        Percentage of the maximum likelihood to use as a threshold to consider
+        other genes as having a particular function aside from the one with
+        greatest likelihood
     debug : bool
-        Set to True to save generated data for debug
+        Set to True to save generated data for debug or detailed analysis
+    _roleset_values : dict
+        Dictionary keyed by query feature ID and list of tuples with roleset string
+        and likelihood as value
+    _role_values : list
+        List of tuples with query feature ID, role ID, and role likelihood
+    _total_role_values : dict
+        Dictionary keyed by role ID and list of tuples with the maximum likelihood
+        of the role and the GPR string of feature IDs as value
+    _complex_values : dict
+        Dictionary keyed by complex ID and likelihood, type, GPR string, list of
+        roles not in the organism, and list of roles not in target search database
+         as values
+    _reaction_values : dict
+        Dictionary keyed by reaction ID and likelihood, type, GPR string, and
+        complex string as values
+    _statistics : dict
+        Dictionary keyed by statistic name and number as value
+    _target_rolesets : dict
+        Dictionary keyed by target feature ID and role ID as value
     """
 
     def __init__(self, search_program_path, search_db_path, fid_role_path, work_folder):
 
         self.search_program_path = search_program_path
         self.search_db_path = search_db_path
-        self.fid_role_path = fid_role_path
         self.work_folder = work_folder
 
-        self.search_program_name = 'usearch'
-        self.search_program_threads = '4'
-        self.search_program_evalue = '1E-5'
-        self.search_program_accel = '0.33'
+        self.search_program_threads = 4
+        self.search_program_evalue = 1E-5
+        self.search_program_accel = 0.33
         self.pseudo_count = 40.0
         self.separator = '///'
-        self.dilution_percent = 80.0
+        self._dilution_percent = 0.8
         self.debug = True
 
-        # # Name of search program database file
-        # 'search_program_db_name': 'protein.udb',
-        # 
-        # # Name of fasta file with protein sequences for target feature IDs
-        # 'protein_sequence_file_name': 'protein.fasta',
-        # # Name of feature ID to role ID mapping file
-        # 'fid_role_file_name': 'otu_fid_role.tsv',
-
-        self._roleset_values = dict()  # @todo Make this a defaultdict
+        self._roleset_values = defaultdict(list)
         self._role_values = list()
         self._total_role_values = dict()
         self._complex_values = dict()
         self._reaction_values = dict()
-        self.statistics = {
+        self._statistics = {
             'num_nonzero_likelihoods': 0,
             'num_zero_likelihoods': 0,
             'average_likelihood': 0.0,
@@ -104,19 +123,41 @@ class Likelihood(object):
             }
         }
 
-    def calculate(self, model, feature_list, complexes_to_roles, reactions_to_complexes):
+        # Read the data file that maps target feature IDs to role IDs and build
+        # a dictionary with target feature ID as key and the role ID as the value.
+        # @todo Lost the concatenated role names in updated fid_role file
+        self._target_rolesets = dict()
+        with open(fid_role_path, 'r') as handle:
+            for line in handle:
+                fields = line.strip('\r\n').split('\t')
+                self._target_rolesets[fields[0]] = fields[1]
+        return
+
+    @property
+    def dilution_percent(self):
+        return self._dilution_percent
+
+    @dilution_percent.setter
+    def dilution_percent(self, new_value):
+        if new_value <= 0.0 or new_value > 1.0:
+            raise ValueError('Dilution percent value must greater than 0 and less than or equal to 1')
+        self._dilution_percent = new_value
+
+    @property
+    def statistics(self):
+        return self._statistics.copy()
+
+    def calculate(self, genome_id, feature_list, template):
         """ Calculate reaction likelihoods from annotated features of a genome.
 
         Parameters
         ----------
-        model : cobra.core.Model
-            ID of model
+        genome_id : str
+            ID of genome (just for naming temporary files)
         feature_list : list of dict
             List of annotated features with ID and amino acid sequence
-        complexes_to_roles : dict
-            Dictionary keyed by complex ID with list of role IDs
-        reactions_to_complexes : dict
-            Dictionary keyed by reaction ID with list of complex IDs
+        template : TemplateModel
+            Template model used to reconstruct a model from genome
 
         Returns
         -------
@@ -128,30 +169,20 @@ class Likelihood(object):
         if not exists(self.work_folder):
             makedirs(self.work_folder)
 
-        # Read the data file that maps target feature IDs to role IDs and build a dictionary with target
-        # feature ID as key and the role ID as the value.
-        # @todo Lost the concatenated role names in updated fid_role file
-        # @todo Move this to init? Make a setter?
-        target_rolesets = dict()
-        with open(self.fid_role_path, 'r') as handle:
-            for line in handle:
-                fields = line.strip('\r\n').split('\t')
-                target_rolesets[fields[0]] = fields[1]
-
         # Run the probabilistic annotation algorithm to calculate reaction likelihoods.
-        self._calculate_roleset_likelihoods(model.id, feature_list, target_rolesets)
+        self._calculate_roleset_likelihoods(genome_id, feature_list)
         self._calculate_role_likelihoods()
         self._calculate_total_role_likelihoods()
-        self._calculate_complex_likelihoods(complexes_to_roles, target_rolesets)
-        self._calculate_reaction_likelihoods(reactions_to_complexes)
+        self._calculate_complex_likelihoods(template.complexes_to_roles)
+        self._calculate_reaction_likelihoods(template.reactions_to_complexes)
 
         # If requested, save all of the intermediate data for debug.
         if self.debug:
-            self._save_data(model.id)
+            self._save_data(genome_id)
 
         return self._reaction_values
 
-    def _calculate_roleset_likelihoods(self, model_id, feature_list, target_rolesets):
+    def _calculate_roleset_likelihoods(self, genome_id, feature_list):
         """ Calculate the likelihoods of rolesets from a search for similar proteins.
 
         A roleset is each possible combination of roles implied by the functions
@@ -167,55 +198,56 @@ class Likelihood(object):
 
         Parameters
         ----------
-        model_id : str
+        genome_id : str
             ID of model
         feature_list : list
             List of annotated features from a genome
-        target_rolesets : dict
-            Dictionary of rolesets with target feature ID as key and role ID as value
         """
 
         if len(feature_list) == 0:
-            raise ValueError('No features in genome for model {0}'.format(model_id))
+            raise ValueError('No features in genome for model {0}'.format(genome_id))
 
         # Run the list of features to build a FASTA file of amino acid sequences used as
         # the query for a search against known features.
-        self.statistics['num_features'] = len(feature_list)
-        query_file = join(self.work_folder, '{0}.faa'.format(model_id))
+        self._statistics['num_features'] = len(feature_list)
+        query_file = join(self.work_folder, '{0}.faa'.format(genome_id))
         with open(query_file, 'w') as handle:
             for feature in feature_list:
                 # Skip the feature if there is no amino acid sequence.
                 if 'protein_translation' in feature:
                     handle.write('>{0}\n{1}\n'.format(feature['id'], feature['protein_translation']))
-                    self.statistics['num_proteins'] += 1
+                    self._statistics['num_proteins'] += 1
                 elif 'aa_sequence' in feature:
                     handle.write('>{0}\n{1}\n'.format(feature['patric_id'], feature['aa_sequence']))
-                    self.statistics['num_proteins'] += 1
+                    self._statistics['num_proteins'] += 1
+        LOGGER.info('Found %d features with amino acid sequence from %d total features',
+                    self._statistics['num_proteins'], self._statistics['num_features'])
 
-        result_file = join(self.work_folder, '{0}.blastout'.format(model_id))
         # Build the command based on the configured search program. Output format 6 is
         # tab-delimited format.
-        if self.search_program_name == 'usearch':
+        result_file = join(self.work_folder, '{0}.blastout'.format(genome_id))
+        if 'usearch' in self.search_program_path.lower():
             args = [self.search_program_path,
                     '-ublast', query_file,
                     '-db', self.search_db_path,
-                    '-evalue', self.search_program_evalue,
-                    '-accel', self.search_program_accel,
-                    '-threads', self.search_program_threads,
+                    '-evalue', str(self.search_program_evalue),
+                    '-accel', str(self.search_program_accel),
+                    '-threads', str(self.search_program_threads),
                     '-blast6out', result_file]
-        elif self.search_program_name == 'blast':
+        elif 'blastp' in self.search_program_path:
             args = [self.search_program_path,
                     '-query', query_file,
                     '-db', self.search_db_path,
                     '-outfmt', '6',
-                    '-evalue', self.search_program_evalue,
-                    '-num_threads', self.search_program_threads,
+                    '-evalue', str(self.search_program_evalue),
+                    '-num_threads', str(self.search_program_threads),
                     '-out', result_file]
         else:
-            raise ValueError('search_program_name must be either usearch or blast')
+            raise ValueError('Search program {0} is not supported, use either usearch or blastp')
 
         # Run the command to search for query proteins against subsystem proteins.
         cmd = ' '.join(args)
+        LOGGER.info('Started search for query proteins using "%s"', cmd)
         try:
             proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             (stdout, stderr) = proc.communicate()
@@ -228,6 +260,7 @@ class Likelihood(object):
                                           .format(args[0], proc.returncode, cmd, stdout, stderr))
         except OSError as e:
             raise LikelihoodError('Failed to run "{0}": {1}'.format(args[0], e.strerror))
+        LOGGER.info('Finished search for query proteins')
 
         # The result file is in BLAST output format 6 where each line describes an alignment
         # found by the search program.  A line has 12 tab delimited fields: (1) query label,
@@ -268,7 +301,7 @@ class Likelihood(object):
                     max_score = value[1]
 
             # Second calculate the cumulative squared scores for each possible roleset.
-            # This along with pseudocount*maxscore is equivalent to multiplying all scores
+            # This along with "pseudocount * maxscore" is equivalent to multiplying all scores
             # by themselves and then dividing by the max score.
             # This is done to avoid some pathological cases and give more weight to higher-scoring hits
             # and not let much lower-scoring hits or noise drown them out.
@@ -278,11 +311,11 @@ class Likelihood(object):
             num_missing_rolesets = 0
             for value in query_scores[query_id]:
                 try:
-                    roleset = target_rolesets[value[0]]
+                    roleset = self._target_rolesets[value[0]]
                 except KeyError:
                     num_missing_rolesets += 1
-                    # message = 'Target id {0} from search results file had no roles in roleset dictionary'.format(value[0])
-                    # raise NoTargetIdError(message)
+                    raise LikelihoodError('Target id {0} from search results file had no roles in roleset dictionary'
+                                          .format(value[0]))
                 rs_score = float(value[1]) ** 2
                 try:
                     roleset_scores[roleset] += rs_score
@@ -314,15 +347,13 @@ class Likelihood(object):
                     warn('Query ID {0} with roleset {1} has an invalid likelihood of {2:1.6f}'
                          .format(query_id, roleset, likelihood))
                 value = (roleset, likelihood)
-                try:
-                    self._roleset_values[query_id].append(value)
-                except KeyError:
-                    self._roleset_values[query_id] = [value]
+                self._roleset_values[query_id].append(value)
 
         # If not needed, delete intermediate files.
         if not self.debug:
             remove(query_file)
             remove(result_file)
+        LOGGER.info('Calculated %d roleset likelihoods', len(self._roleset_values))
 
         return
 
@@ -351,15 +382,11 @@ class Likelihood(object):
         for query_id in self._roleset_values:
             # Convert feature annotations into functional roles.
             # See equation 3 in the paper ("Calculating reaction likelihoods" section).
-            # @todo Use a defaultdict here?
-            functional_likelihood = dict()
+            functional_likelihood = defaultdict(float)
             for value in self._roleset_values[query_id]:
                 # Add up all the instances of each particular role on the list.
                 for role in value[0].split(self.separator):
-                    try:
-                        functional_likelihood[role] += value[1]
-                    except KeyError:
-                        functional_likelihood[role] = value[1]
+                    functional_likelihood[role] += value[1]
 
             # Add the roles to the list of role likelihoods. Each entry in the list is a
             # tuple with query feature ID, role, and role likelihood.
@@ -369,6 +396,7 @@ class Likelihood(object):
                          .format(query_id, role, functional_likelihood[role]))
                 self._role_values.append((query_id, role, functional_likelihood[role]))
 
+        LOGGER.info('Calculated %d role likelihoods', len(self._role_values))
         return
 
     def _calculate_total_role_likelihoods(self):
@@ -408,17 +436,13 @@ class Likelihood(object):
         # assert that these are the most likely genes responsible for that role.
         # See equation 4 in the paper ("Calculating reaction likelihoods" section).
         # role -> [ query feature ID 1, query feature ID 2, ... ]
-        role_genes = dict()  # @todo Make this a defaultdict
-        dilution_percent = self.dilution_percent / 100.0
+        role_genes = defaultdict(list)
         for value in self._role_values:
             if value[1] not in role_max_likelihood:
                 raise LikelihoodError('Role {0} not placed properly in role_max_likelihood dictionary?'
                                       .format(value[1]))
-            if value[2] >= dilution_percent * role_max_likelihood[value[1]]:
-                try:
-                    role_genes[value[1]].append(value[0])
-                except KeyError:
-                    role_genes[value[1]] = [value[0]]
+            if value[2] >= self._dilution_percent * role_max_likelihood[value[1]]:
+                role_genes[value[1]].append(value[0])
 
         # Build the dictionary of total role probabilities.
         for role in role_max_likelihood:
@@ -434,9 +458,10 @@ class Likelihood(object):
                 warn('Role "{0}" has invalid likelihood {1:1.6f}'.format(role, role_max_likelihood[role]))
             self._total_role_values[role] = (role_max_likelihood[role], gpr)
 
+        LOGGER.info('Calculated %d total role likelihoods', len(self._total_role_values))
         return
 
-    def _calculate_complex_likelihoods(self, complexes_to_roles, target_rolesets):
+    def _calculate_complex_likelihoods(self, complexes_to_roles):
         """ Compute the likelihood of each protein complex from the likelihood of each role.
 
         A protein complex represents a set functional roles that must all be present
@@ -464,8 +489,6 @@ class Likelihood(object):
         ----------
         complexes_to_roles : dict
             Dictionary with complex ID as key and list of role IDs as value
-        target_rolesets : dict
-            Dictionary of rolesets with target feature ID as key and role ID as value
         """
 
         if len(self._total_role_values) == 0:
@@ -474,9 +497,9 @@ class Likelihood(object):
         # Build a set of all of the role IDs in the search database (used to distinguish between
         # roles that are unavailable in query organism and roles that have no representatives).
         all_roles = set()
-        for feature_id in target_rolesets:
+        for feature_id in self._target_rolesets:
             # for role_id in target_roles[feature_id]:
-            all_roles.add(target_rolesets[feature_id])
+            all_roles.add(self._target_rolesets[feature_id])
 
         # Iterate over complexes from template model and compute complex probabilities from
         # total role probabilities. Separate out cases where no features seem to exist in the
@@ -487,7 +510,7 @@ class Likelihood(object):
             # query organism, or do not exist in the search database.
             complex_roles = complexes_to_roles[complex_id]
             avail_roles = list()  # Roles that may have representatives in the query organism
-            unavail_roles = list()  # Roles that have representatives in search database but that are not in query organism
+            unavail_roles = list()  # Roles that have representatives in search database but not in query organism
             missing_roles = list()  # Roles with no representatives in search database
             for role in complex_roles:
                 if role not in all_roles:
@@ -508,26 +531,26 @@ class Likelihood(object):
             # Determine the type and GPR string for the complex.
             if len(missing_roles) == len(complex_roles):
                 # All of the roles do not exist in the search database.
-                self.statistics['complex_types']['num_no_reps'] += 1
+                self._statistics['complex_types']['num_no_reps'] += 1
                 self._complex_values[complex_id]['type'] = 'CPLX_NOREPS'
                 continue
             if len(unavail_roles) == len(complex_roles):
                 # All of the roles are not in the query organism.
-                self.statistics['complex_types']['num_not_there'] += 1
+                self._statistics['complex_types']['num_not_there'] += 1
                 self._complex_values[complex_id]['type'] = 'CPLX_NOTTHERE'
                 continue
             if len(unavail_roles) + len(missing_roles) == len(complex_roles):
                 # Some roles do not exist in the search database and the remainder are not in the query organism.
-                self.statistics['complex_types']['num_no_reps_and_not_there'] += 1
+                self._statistics['complex_types']['num_no_reps_and_not_there'] += 1
                 self._complex_values[complex_id]['type'] = 'CPLX_NOREPS_AND_NOTTHERE'
                 continue
             if len(avail_roles) == len(complex_roles):
                 # All of the roles are in the query organism.
-                self.statistics['complex_types']['num_full'] += 1
+                self._statistics['complex_types']['num_full'] += 1
                 self._complex_values[complex_id]['type'] = 'CPLX_FULL'
             elif len(avail_roles) < len(complex_roles):
                 # Some of the roles are in the query organism.
-                self.statistics['complex_types']['num_partial'] += 1
+                self._statistics['complex_types']['num_partial'] += 1
                 self._complex_values[complex_id]['type'] = 'CPLX_PARTIAL_{0}_of_{1}' \
                     .format(len(avail_roles), len(complex_roles))
 
@@ -550,6 +573,7 @@ class Likelihood(object):
                 warn('Complex {0} has invalid likelihood {1:1.6f}'.format(complex_id, min_likelihood))
             self._complex_values[complex_id]['likelihood'] = min_likelihood
 
+        LOGGER.info('Calculated %d complex likelihoods', len(self._complex_values))
         return
 
     def _calculate_reaction_likelihoods(self, reactions_to_complexes):
@@ -578,6 +602,7 @@ class Likelihood(object):
         # Find the maximum likelihood of complexes catalyzing a particular reaction
         # and set that as the reaction likelihood.
         # See equation 6 in the paper ("Calculating reaction likelihoods" section).
+        total_likelihood = 0.0
         for reaction_id in reactions_to_complexes:
             # Get details on the complexes linked to the reaction. Each entry in the
             # list is a tuple that contains (1) complex ID, (2) complex likelihood, and
@@ -594,21 +619,21 @@ class Likelihood(object):
             complex_string = ''
             if len(complexes) > 0:
                 reaction_type = 'HASCOMPLEXES'
-                self.statistics['reaction_types']['has_complexes'] += 1
+                self._statistics['reaction_types']['has_complexes'] += 1
                 complexes.sort(key=lambda tup: tup[1], reverse=True)
                 max_likelihood = complexes[0][1]  # Complex with maximum likelihood is now the first one in the list
-                for complex in complexes:
-                    complex_string += '%s (%1.4f; %s)%s' % (complex[0], complex[1], complex[2], self.separator)
+                for complx in complexes:
+                    complex_string += '%s (%1.4f; %s)%s' % (complx[0], complx[1], complx[2], self.separator)
                 complex_string = complex_string[:-len(self.separator)]  # Remove the final separator
             else:
                 # Note this should not happen since only reactions with complexes are included
                 # in the reaction_complexes dictionary (leftover from original code).
                 reaction_type = 'NOCOMPLEXES'
-                self.statistics['reaction_types']['no_complexes'] += 1
+                self._statistics['reaction_types']['no_complexes'] += 1
             if max_likelihood > 0.0:
-                self.statistics['num_nonzero_likelihoods'] += 1
+                self._statistics['num_nonzero_likelihoods'] += 1
             else:
-                self.statistics['num_zero_likelihoods'] += 1
+                self._statistics['num_zero_likelihoods'] += 1
             if max_likelihood < 0.0 or max_likelihood > 1.0:
                 warn('Reaction {0} has invalid likelihood {1:1.6f}'.format(reaction_id, max_likelihood))
 
@@ -616,11 +641,10 @@ class Likelihood(object):
             # a complex with 80% probability being linked by OR to another with a 5%
             # probability.  The same cutoff as is used for which features go with a role
             # is applied here.
-            dilution_percent = self.dilution_percent / 100.0  # @todo Make a setter so value is just set right
             gpr_list = list()
             for complex_id in reactions_to_complexes[reaction_id]:
                 if complex_id in self._complex_values:
-                    if self._complex_values[complex_id]['likelihood'] < max_likelihood * dilution_percent:
+                    if self._complex_values[complex_id]['likelihood'] < max_likelihood * self._dilution_percent:
                         continue
                     if len(self._complex_values[complex_id]['gpr']) > 0:
                         gpr_list.append(self._complex_values[complex_id]['gpr'])
@@ -630,26 +654,29 @@ class Likelihood(object):
                 gpr = ' or '.join(list(set(gpr_list)))
 
             # Add the reaction to the dictionary.
-            # reaction_id += '0'  # ModelSEED always uses a community index of 0 @todo Fix up for modelseed
             self._reaction_values[reaction_id] = dict()
             self._reaction_values[reaction_id]['likelihood'] = max_likelihood
             self._reaction_values[reaction_id]['type'] = reaction_type
             self._reaction_values[reaction_id]['gpr'] = gpr
             self._reaction_values[reaction_id]['complex_string'] = complex_string
+            total_likelihood += max_likelihood
 
+        self._statistics['average_likelihood'] = total_likelihood / float(len(self._reaction_values))
+        LOGGER.info('Calculated %d reaction likelihoods with average %f',
+                    len(self._reaction_values), self._statistics['average_likelihood'])
         return
 
-    def _save_data(self, model_id):
+    def _save_data(self, genome_id):
         """ Save internal data structures to files for detailed analysis or debug.
 
         Parameters
         ----------
-        model_id : str
+        genome_id : str
             ID of model
         """
 
         # Save roleset likelihoods to a file.
-        file_name = join(self.work_folder, '{0}.roleset.tsv'.format(model_id))
+        file_name = join(self.work_folder, '{0}.roleset.tsv'.format(genome_id))
         with open(file_name, 'w') as handle:
             handle.write('\t'.join(['Query ID', 'Likelihood', 'Roleset']) + '\n')
             for query_id in sorted(self._roleset_values):
@@ -657,14 +684,14 @@ class Likelihood(object):
                     handle.write('{0}\t{1:1.6f}\t{2}\n'.format(query_id, value[1], value[0]))
 
         # Save the role likelihoods to a file.
-        file_name = join(self.work_folder, '{0}.role.tsv'.format(model_id))
+        file_name = join(self.work_folder, '{0}.role.tsv'.format(genome_id))
         with open(file_name, 'w') as handle:
             handle.write('\t'.join(['Query ID', 'Likelihood', 'Role']) + '\n')
             for value in sorted(self._role_values):
                 handle.write('{0}\t{1:1.6f}\t{2}\n'.format(value[0], value[2], value[1]))
 
         # Save the total role likelihoods to a file.
-        file_name = join(self.work_folder, '{0}.totalrole.tsv'.format(model_id))
+        file_name = join(self.work_folder, '{0}.totalrole.tsv'.format(genome_id))
         with open(file_name, 'w') as handle:
             handle.write('\t'.join(['Role', 'Likelihood', 'GPR']) + '\n')
             for role in sorted(self._total_role_values):
@@ -672,7 +699,7 @@ class Likelihood(object):
                 handle.write('{0}\t{1:1.6f}\t{2}\n'.format(role, value[0], value[1]))
 
         # Save the complex likelihoods to a file.
-        file_name = join(self.work_folder, '{0}.complex.tsv'.format(model_id))
+        file_name = join(self.work_folder, '{0}.complex.tsv'.format(genome_id))
         with open(file_name, 'w') as handle:
             handle.write(
                 '\t'.join(['Complex ID', 'Likelihood', 'Type', 'GPR', 'Unavailable Roles', 'Missing Roles']) + '\n')
@@ -683,7 +710,7 @@ class Likelihood(object):
                                      value['unavail_roles'], value['missing_roles']))
 
         # Save the reaction likelihoods to a file.
-        file_name = join(self.work_folder, '{0}.reaction.tsv'.format(model_id))
+        file_name = join(self.work_folder, '{0}.reaction.tsv'.format(genome_id))
         with open(file_name, 'w') as handle:
             handle.write('\t'.join(['Reaction ID', 'Likelihood', 'Type', 'Complexes', 'GPR']) + '\n')
             for reaction_id in sorted(self._reaction_values):
@@ -738,7 +765,7 @@ def download_data_files(fid_role_path, protein_sequence_path, search_db_path, se
                 '-in', protein_sequence_path,
                 '-dbtype prot']
     else:
-        raise ValueError('Search program must be either usearch or blast')
+        raise ValueError('Search program {0} is not supported, use either usearch or mkblastdb')
 
     # Run the command to compile the database from the protein fasta file.
     cmd = ' '.join(args)
