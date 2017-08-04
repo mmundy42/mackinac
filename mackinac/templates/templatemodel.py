@@ -5,7 +5,7 @@ from six import iteritems
 
 from cobra.core import Object, DictList, Model, Gene
 
-from .util import read_source_file, create_exchange_reaction
+from .util import read_source_file, create_boundary
 from .templatecompartment import create_template_compartment, compartment_fields
 from .templatebiomass import create_template_biomass_component, biomass_component_fields
 from .templatebiomass import create_template_biomass, biomass_fields
@@ -54,6 +54,10 @@ class TemplateModel(Object):
         List of TemplateBiomass objects
     ec_number_index : dict
         Dictionary with EC number as key and list of roles for EC number as value
+    _complexes_to_roles : dict
+        Dictionary with complex ID as key and list of role IDs as value
+    _reactions_to_complexes : dict
+        Dictionary with reaction ID as key and list of complex IDs as value
     """
 
     def __init__(self, id, name, type='growth', domain='bacteria'):
@@ -69,14 +73,17 @@ class TemplateModel(Object):
         self.biomasses = DictList()
         self.ec_number_index = defaultdict(list)
         self.role_name_index = defaultdict(list)
+        self._complexes_to_roles = dict()
+        self._reactions_to_complexes = dict()
 
     def init_from_files(self, compartment_filename, biomass_filename, component_filename,
                         reaction_filename, complex_filename, role_filename, universal_metabolites,
                         universal_reactions, verbose=False):
-        """ Initialize object from ModelSEED source files.
+        """ Initialize object from source files.
         
-        ModelSEED source files are tab-delimited files with a header line that defines
+        The source files are tab-delimited files with a header line that defines
         the fields. Each line contains the attributes for initializing an object.
+        The format of the source files comes from ModelSEED.
         
         Parameters
         ----------
@@ -177,6 +184,8 @@ class TemplateModel(Object):
             warn('{0} template reactions were not found in universal reactions'.format(skipped))
         if bad_status > 0:
             warn('{0} template reactions reference a universal reaction with bad status'.format(bad_status))
+        for rxn in self.reactions.query(lambda x: len(x) > 0, 'complex_ids'):
+            self.reactions_to_complexes[rxn.id] = rxn.complex_ids
 
         # Get roles from the role source file. Only roles that are referenced by
         # complexes are added to the template model.
@@ -190,12 +199,22 @@ class TemplateModel(Object):
             self.roles.union(roles)
             for role in roles:
                 role.complex_ids.add(complx.id)
+        for complx in self.complexes.query(lambda x: len(x) > 0, 'roles'):
+            self.complexes_to_roles[complx.id] = [role['role_id'] for role in complx.roles]
 
         # Build an index to lookup roles by EC number.
         self._build_role_ec_index()
         LOGGER.info('Finished initializing from source files')
 
         return
+
+    @property
+    def complexes_to_roles(self):
+        return self._complexes_to_roles
+
+    @property
+    def reactions_to_complexes(self):
+        return self._reactions_to_complexes
 
     def _build_role_ec_index(self):
         """ Build an index for finding roles by Enzyme Commission number. """
@@ -218,22 +237,35 @@ class TemplateModel(Object):
             self.role_name_index.append(role.search_name[0])
         return
 
-    def reconstruct(self, genome, genome_features, biomass_id, annotation='PATRIC'):
+    def reconstruct(self, model_id, genome_features, biomass_id, model_name=None,
+                    gc_content=0.5, annotation='PATRIC'):
         """ Reconstruct a draft model from the genome of an organism.
-        
-        For template models created from ModelSEED source files, only a PATRIC 
-        annotation works to reconstruct a draft model. Use the get_genome_summary() 
-        and get_genome_features() functions to retrieve the PATRIC annotation 
-        needed for the first two parameters.
-        
+
+        The reconstruction algorithm is essentially a string matching algorithm.
+        When the function of a genome feature matches the name of a role in the
+        template, then all reactions linked to the role are added to the draft
+        model. This means that the source for the names of the template roles and
+        the type of annotation must be consistent.
+
+        For example, with template models created from ModelSEED source files,
+        only a PATRIC annotation works to reconstruct a draft model. Use the
+        get_genome_summary() and get_genome_features() functions to retrieve the
+        information needed for the input parameters.
+
         Parameters
         ----------
-        genome : dict
-            Dictionary of genome summary data for organism
+        model_id : str
+            ID for draft model of organism
         genome_features : list of dict
-            List of feature data for organism
+            List of feature data for organism. The key names in the dictionary
+            can be different based on the type of annotation but an ID and function
+            are required for the reconstruction algorithm to work.
         biomass_id : str
             ID of biomass entity used to create biomass objective
+        model_name : str, optional
+            Name for draft model of organism
+        gc_content : float, optional
+            Percent GC content in genome of organism (value between 0 and 1)
         annotation : {'PATRIC'}
             Type of annotation in feature data
             
@@ -243,9 +275,8 @@ class TemplateModel(Object):
             Draft model of organism based on genome features
         """
 
-        # @todo Should there be a check to make sure template model is appropriate for organism?
-        # if genome['domain'].lower() != self.domain:
-        #     raise TemplateError('domain mismatch')
+        if gc_content < 0. or gc_content > 1.:
+            raise ValueError('Percent GC content value must be between 0 and 1')
 
         # Create Feature objects from the list of features in the genome annotation.
         if annotation == 'PATRIC':
@@ -253,10 +284,10 @@ class TemplateModel(Object):
         else:
             raise ValueError('Annotation type {0} is not supported'.format(annotation))
         if len(feature_list) == 0:
-            raise ValueError('No valid features found in genome {0}'.format(genome['genome_id']))
+            raise ValueError('No valid features found in genome features')
 
         # Create a new cobra.core.Model object.
-        model = Model(genome['genome_id'], name=genome['organism_name'])
+        model = Model(model_id, name=model_name)
         model_stats = defaultdict(int)
 
         # Start by adding universal and spontaneous template reactions.
@@ -301,8 +332,8 @@ class TemplateModel(Object):
 
         # It is not possible to reconstruct a model if there are no matched roles.
         if len(matched_roles) == 0:
-            raise TemplateError('Genome {0} with {1} features has no matches to roles in template {2}'
-                                .format(genome['genome_id'], len(genome_features), self.id))
+            raise TemplateError('Genome with {0} features has no matches to roles in template {1}'
+                                .format(len(genome_features), self.id))
 
         # For every matched role, create model reactions from the associated template reactions.
         LOGGER.info('Started adding conditional reactions to model')
@@ -374,22 +405,17 @@ class TemplateModel(Object):
         # Add exchange reactions for all metabolites in the extracellular compartment.
         LOGGER.info('Started adding exchange reactions to model')
         extracellular = model.metabolites.query(lambda x: x == 'e', 'compartment')
-        exchanges = [create_exchange_reaction(met) for met in extracellular]
+        exchanges = [create_boundary(met) for met in extracellular]
         model.add_reactions(exchanges)
         LOGGER.info('Finished adding %d exchange reactions to model', len(exchanges))
 
-        # Check genome summary for gc content value, otherwise use default value.
-        LOGGER.info('Started adding biomass reaction')
-        try:
-            gc_content = genome['gc_content']
-            if gc_content > 1.0:
-                gc_content /= 100.0
-        except KeyError:
-            gc_content = 0.5
-            LOGGER.warn('GC content not found in genome summary, using default value of {0}'
-                        .format(gc_content))
+        # Add a magic exchange reaction for the special biomass metabolite which seems to be
+        # required for ModelSEED models and which we know has id "cpd11416_c".
+        # @todo Move this since it is specific to ModelSEED?
+        model.add_reactions([create_boundary(self.metabolites.get_by_id('cpd11416_c'), type='sink')])
 
         # Create a biomass reaction, add it to the model, and make it the objective.
+        LOGGER.info('Started adding biomass reaction')
         try:
             biomass_reaction = self.biomasses.get_by_id(biomass_id).create_objective(gc_content)
         except KeyError:
@@ -398,13 +424,9 @@ class TemplateModel(Object):
         biomass_reaction.objective_coefficient = 1.0
         LOGGER.info('Finished adding biomass reaction {0} as objective'.format(biomass_reaction.id))
 
-        # Add a magic exchange reaction for the special biomass metabolite which seems to be
-        # required for ModelSEED models and which we know has id "cpd11416_c".
-        model.add_reactions([create_exchange_reaction(model.metabolites.get_by_id('cpd11416_c'))])
-
         return model
 
-    def reaction_to_role(self, reaction_id_list):
+    def map_reaction_to_role(self, reaction_id_list):
         """ Follow the path from a reaction to roles.
         
         Parameters
@@ -439,7 +461,7 @@ class TemplateModel(Object):
                     output[reaction.id]['roles'][role.id]['complex_id'] = complx.id
         return output
 
-    def role_to_reaction(self, role_id_list):
+    def map_role_to_reaction(self, role_id_list):
         """ Follow the path from a role to reactions. 
         
         Parameters
@@ -487,4 +509,6 @@ class TemplateModel(Object):
 
         model = Model(self.id, name=self.name)
         model.add_reactions([rxn.create_model_reaction(self.compartments) for rxn in self.reactions])
+        extracellular = model.metabolites.query(lambda x: x == 'e', 'compartment')
+        model.add_reactions([create_boundary(met) for met in extracellular])
         return model

@@ -2,7 +2,7 @@ from six import string_types, iteritems
 
 from cobra.core import Reaction, Object
 
-from .util import change_compartment
+from .util import change_compartment, direction_to_bounds
 
 # Required fields in source file for creating a TemplateReaction object.
 reaction_fields = {
@@ -68,8 +68,6 @@ class TemplateReaction(Object):
         Type used when adding reaction to a model
     _direction : {'=', '<', '>'}
         Default direction when added to a model by gene association (bi-directional, reverse, or forward)
-    _bounds : tuple
-        Lower bound and upper bound (managed with direction)
     _gapfill_direction : {'<', '>', '?'}
         Direction when directionality is reversed by gap fill algorithm (reverse, forward, unknown)
     _complex_ids : list of str
@@ -91,7 +89,6 @@ class TemplateReaction(Object):
         self.reverse_cost = 0.0
         self._type = 'gapfilling'
         self._direction = '='
-        self._bounds = (-1000.0, 1000.0)
         self._gapfill_direction = '='
         self._compartment_ids = list()
         self._complex_ids = list()
@@ -122,12 +119,6 @@ class TemplateReaction(Object):
         if new_direction not in reaction_directions:
             raise ValueError('Reaction direction {0} is not valid for reaction {1}'.format(new_direction, self.id))
         self._direction = new_direction
-        if self._direction == '=':
-            self._bounds = (-1000.0, 1000.0)
-        elif self._direction == '>':
-            self._bounds = (0.0, 1000.0)
-        else:
-            self._bounds = (-1000.0, 0.0)
 
     @property
     def gapfill_direction(self):
@@ -196,14 +187,16 @@ class TemplateReaction(Object):
         """
 
         # Create a new cobra.core.Reaction object.
+        # Note that bounds are set to gap fill direction to enable gap fill.
+        bounds = direction_to_bounds(self.gapfill_direction)
         model_reaction = Reaction(id=self.model_id, name=self.name,
-                                  lower_bound=self._bounds[0], upper_bound=self._bounds[1])
+                                  lower_bound=bounds[0], upper_bound=bounds[1])
 
         # Create new cobra.core.Metabolite objects and place them in a specific compartment.
         model_metabolites = dict()
         for metabolite, coefficient in iteritems(self._metabolites):
             model_met = metabolite.copy()
-            model_compartment = compartments.get_by_id(model_met.compartment)
+            model_compartment = compartments.get_by_id(model_met.compartment)  # @todo Need to figure out type here
             if model_compartment.model_id != self._compartment_ids[int(model_compartment.id)]:
                 raise ValueError('Inconsistent order of compartment IDs in template reaction {0}'
                                  .format(self.id))
@@ -213,6 +206,7 @@ class TemplateReaction(Object):
 
         # Add notes about the template reaction for reference.
         model_reaction.notes['template_id'] = self.id
+        model_reaction.notes['direction'] = self.direction
         model_reaction.notes['gapfill_direction'] = self.gapfill_direction
         model_reaction.notes['base_cost'] = self.base_cost
         model_reaction.notes['forward_cost'] = self.forward_cost

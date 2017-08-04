@@ -208,23 +208,80 @@ def print_role_to_reactions(output):
     return
 
 
-def create_exchange_reaction(metabolite):
-    """ Create an exchange reaction for a metabolite.
-    
+def create_boundary(metabolite, type="exchange", reaction_id=None, lb=None, ub=1000.0):
+    """ Create a boundary reaction for a given metabolite.
+
+    Note this function is adapted from cobra.core.Model.add_boundary() method
+    by modifying it to only create the reaction and not add it to a model.
+
+    There are three different types of pre-defined boundary reactions:
+    exchange, demand, and sink reactions.
+    An exchange reaction is a reversible, imbalanced reaction that adds
+    to or removes an extracellular metabolite from the extracellular
+    compartment.
+    A demand reaction is an irreversible reaction that consumes an
+    intracellular metabolite.
+    A sink is similar to an exchange but specifically for intracellular
+    metabolites.
+
+    If you set the reaction `type` to something else, you must specify the
+    desired identifier of the created reaction along with its upper and
+    lower bound. The name will be given by the metabolite name and the
+    given `type`.
+
     Parameters
     ----------
     metabolite : cobra.core.Metabolite
-        Metabolite object for metabolite that needs an exchange reaction
-        
+        Any given metabolite. The compartment is not checked but you are
+        encouraged to stick to the definition of exchanges and sinks.
+    type : str, {"exchange", "demand", "sink"}
+        Using one of the pre-defined reaction types is easiest. If you
+        want to create your own kind of boundary reaction choose
+        any other string, e.g., 'my-boundary'.
+    reaction_id : str, optional
+        The ID of the resulting reaction. Only used for custom reactions.
+    lb : float, optional
+        The lower bound of the resulting reaction. Only used for custom
+        reactions.
+    ub : float, optional
+        The upper bound of the resulting reaction. For the pre-defined
+        reactions this default value determines all bounds.
+
     Returns
     -------
     cobra.core.Reaction
-        Exchange reaction for given metabolite
+        The created boundary reaction
     """
 
-    rxn = Reaction(id='EX_{0}'.format(metabolite.id),
-                   name='{0} exchange'.format(metabolite.name),
-                   lower_bound=-1000.0,
-                   upper_bound=1000.00)
+    types = dict(exchange=("EX", -ub, ub), demand=("DM", 0, ub), sink=("SK", -ub, ub))
+    if type in types:
+        prefix, lb, ub = types[type]
+        reaction_id = "{}_{}".format(prefix, metabolite.id)
+    name = "{} {}".format(metabolite.name, type)
+    rxn = Reaction(id=reaction_id, name=name, lower_bound=lb, upper_bound=ub)
     rxn.add_metabolites({metabolite: -1})
     return rxn
+
+
+def direction_to_bounds(direction):
+    """ Convert reaction direction to upper and lower bounds.
+
+    Parameters
+    ----------
+    direction : {'=', '<', '>'}
+        Reaction direction symbol from source file
+
+    Returns
+    -------
+    tuple
+        Lower bound and upper bound
+    """
+
+    if direction == '=':
+        return -1000.0, 1000.0
+    elif direction == '>':
+        return 0.0, 1000.0
+    elif direction == '<':
+        return -1000.0, 0.0
+    else:
+        raise ValueError('Direction {0} is not valid'.format(direction))

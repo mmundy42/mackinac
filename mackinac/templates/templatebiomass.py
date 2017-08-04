@@ -92,7 +92,7 @@ class TemplateBiomassComponent(Object):
         self.biomass_id = biomass_id
         self._class_type = class_type
 
-        self.compartment_id = 'c'
+        self.compartment_id = 'c'  # @todo This has the side effect of adding metabolites in c compartment to template
         self.coefficient = 1.0
         self._coefficient_type = None
         self._linked_metabolites = dict()

@@ -5,6 +5,7 @@ from .modelseed import delete_modelseed_model, gapfill_modelseed_model, get_mode
 from .workspace import get_workspace_object_data, get_workspace_object_meta, list_workspace_objects, \
     put_workspace_object, delete_workspace_object
 from .genome import get_genome_summary, get_genome_features
-from .likelihood import calculate_modelseed_likelihoods, calculate_likelihoods, download_data_files
+from .likelihood import download_data_files
+from .reconstruct import reconstruct_model_from_patric
 from .SeedClient import get_token
 from . import templates
