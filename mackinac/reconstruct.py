@@ -63,7 +63,8 @@ def reconstruct_model_from_patric(genome_id, template, biomass_id, search_progra
     # Generate likelihood-based gene annotation for the organism.
     LOGGER.info('Started likelihood-based annotation')
     likelihood = LikelihoodAnnotation(search_program_path, search_db_path, fid_role_path, work_folder)
-    reaction_likelihoods = likelihood.calculate(genome_id, features, template)
+    reaction_likelihoods = likelihood.calculate(genome_id, features, template.complexes_to_roles,
+                                                template.reactions_to_complexes)
     LOGGER.info('Finished likelihood-based annotation')
 
     # Update model with reaction likelihoods.

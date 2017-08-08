@@ -19,7 +19,7 @@ setup(
     packages=find_packages(),
     setup_requires=[],
     install_requires=requirements,
-    tests_require=['pytest'],
+    tests_require=['pytest', 'numpy'],
     package_data={'': ['mackinac/data/*']},
     author='Michael Mundy, Helena Mendes-Soares, Nicholas Chia',
     author_email='mundy.michael@mayo.edu',

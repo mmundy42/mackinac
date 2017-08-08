@@ -147,7 +147,7 @@ class LikelihoodAnnotation(object):
     def statistics(self):
         return self._statistics.copy()
 
-    def calculate(self, genome_id, feature_list, template):
+    def calculate(self, genome_id, feature_list, complexes_to_roles, reactions_to_complexes):
         """ Calculate reaction likelihoods from annotated features of a genome.
 
         Parameters
@@ -156,13 +156,15 @@ class LikelihoodAnnotation(object):
             ID of genome (just for naming temporary files)
         feature_list : list of dict
             List of annotated features with ID and amino acid sequence
-        template : TemplateModel
-            Template model used to reconstruct a model from genome
+        complexes_to_roles : dict
+            Dictionary with complex ID as key and list of role IDs as value
+        reactions_to_complexes : dict
+            Dictionary with reaction ID as key and list of complex IDs as value
 
         Returns
         -------
         dict
-            Dictionary of calculated likelihoods and statistics
+            Dictionary keyed by reaction ID of calculated likelihoods and statistics
         """
 
         # If needed, create folder for intermediate files.
@@ -173,8 +175,8 @@ class LikelihoodAnnotation(object):
         self._calculate_roleset_likelihoods(genome_id, feature_list)
         self._calculate_role_likelihoods()
         self._calculate_total_role_likelihoods()
-        self._calculate_complex_likelihoods(template.complexes_to_roles)
-        self._calculate_reaction_likelihoods(template.reactions_to_complexes)
+        self._calculate_complex_likelihoods(complexes_to_roles)
+        self._calculate_reaction_likelihoods(reactions_to_complexes)
 
         # If requested, save all of the intermediate data for debug.
         if self.debug:
@@ -779,7 +781,8 @@ def download_data_files(fid_role_path, protein_sequence_path, search_db_path, se
                 details = '"%s" failed with return code %d:\nCommand: "%s"\nStdout: "%s"\nStderr: "%s"' \
                           % (args[0], proc.returncode, cmd, stdout, stderr)
                 raise LikelihoodError(details)
-    except OSError as e:
-        raise LikelihoodError('Failed to run "%s": %s' % (cmd, e.strerror))
+    except Exception as e:
+        warn('Failed to run "%s": %s' % (cmd, e.strerror))
+        raise
 
     return

@@ -18,5 +18,5 @@ class TestTemplateModel:
                                                                      'mackinac/data/modelseed/bacteria',
                                                                      'bacteria', 'bacteria')
         model = template.to_model()
-        assert len(model.reactions) == 20329
+        assert len(model.reactions) == 22166
         assert len(model.metabolites) == 15077

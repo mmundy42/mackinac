@@ -10,6 +10,7 @@ from cobra import Model, Reaction, Metabolite, Gene, DictList
 
 from .SeedClient import SeedClient, ServerError, ObjectNotFoundError, JobError, handle_server_error
 from .workspace import get_workspace_object_meta, get_workspace_object_data, put_workspace_object
+from .likelihood import LikelihoodAnnotation
 
 # ModelSEED service endpoint
 modelseed_url = 'http://p3c.theseed.org/dev1/services/ProbModelSEED'
@@ -50,6 +51,82 @@ def _make_modelseed_reference(name):
     if ms_client.username is None:
         ms_client.set_authentication_token()
     return '/{0}/{1}/{2}'.format(ms_client.username, model_folder, name)
+
+
+def calculate_modelseed_likelihoods(model_id, search_program_path, search_db_path, fid_role_path, work_folder):
+    """ Calculate reaction likelihoods for a ModelSEED model.
+
+    Reaction likelihood calculation is done locally and results are stored in the
+    model's folder in workspace. Caller must run download_data_files() function
+    before running this function to prepare for local calculation of likelihoods.
+
+    Parameters
+    ----------
+    model_id : str
+        ID of model
+    search_program_path : str
+        Path to search program executable
+    search_db_path : str
+        Path to search database file
+    fid_role_path : str
+        Path to feature ID to role ID mapping file
+    work_folder : str
+        Path to folder for storing intermediate files
+
+    Returns
+    -------
+    dict
+        Dictionary keyed by reaction ID of calculated likelihoods and statistics
+
+    """
+
+    # Get the model statistics to confirm the model exists and get workspace reference.
+    stats = get_modelseed_model_stats(model_id)
+
+    # Get the genome object stored with the model.
+    genome = get_workspace_object_data(join(stats['ref'], 'genome'))
+
+    # Get the model template object used to build the model.
+    template = get_workspace_object_data(stats['template_ref'])
+
+    # Create a dictionary to map a complex ID to a list of role IDs as defined in the template.
+    complexes_to_roles = dict()
+    for index in range(len(template['complexes'])):
+        complx = template['complexes'][index]
+        complex_id = complx['id']
+        if len(complx['complexroles']) > 0:
+            complexes_to_roles[complex_id] = list()
+            for crindex in range(len(complx['complexroles'])):
+                # A complex has a list of complexroles and each complexrole has a reference
+                # to a role. Role ID is last element in reference.
+                role_id = complx['complexroles'][crindex]['templaterole_ref'].split('/')[-1]
+                complexes_to_roles[complex_id].append(role_id)
+
+    # Create a dictionary to map a reaction ID to a list of complex IDs as defined in the template.
+    reactions_to_complexes = dict()
+    for index in range(len(template['reactions'])):
+        reaction_id = template['reactions'][index]['id']
+        if len(template['reactions'][index]['templatecomplex_refs']) > 0:
+            reactions_to_complexes[reaction_id] = list()
+            for complex_ref in template['reactions'][index]['templatecomplex_refs']:
+                # Complex ID is last element in reference.
+                reactions_to_complexes[reaction_id].append(complex_ref.split('/')[-1])
+
+    # Generate likelihood-based gene annotation for the organism.
+    LOGGER.info('Started likelihood-based annotation')
+    likelihood = LikelihoodAnnotation(search_program_path, search_db_path, fid_role_path, work_folder)
+    reaction_likelihoods = likelihood.calculate(model_id, genome['features'],
+                                                complexes_to_roles, reactions_to_complexes)
+    LOGGER.info('Finished likelihood-based annotation')
+
+    # Store reaction likelihoods with the model.
+    reaction_list = list()
+    for reaction_id in sorted(reaction_likelihoods):
+        value = reaction_likelihoods[reaction_id]
+        reaction_list.append((reaction_id, value['likelihood'], value['type'], value['complex_string'], value['gpr']))
+    put_workspace_object(join(stats['ref'], 'rxnprobs'), 'rxnprobs',
+                         {'reaction_probabilities': reaction_list}, overwrite=True)
+    return reaction_likelihoods
 
 
 def delete_modelseed_model(model_id):
