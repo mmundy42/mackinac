@@ -43,6 +43,22 @@ mackinac\.modelseed module
     :undoc-members:
     :show-inheritance:
 
+mackinac\.prevlikelihood module
+-------------------------------
+
+.. automodule:: mackinac.prevlikelihood
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+mackinac\.reconstruct module
+----------------------------
+
+.. automodule:: mackinac.reconstruct
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 mackinac\.workspace module
 --------------------------
 

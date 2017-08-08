@@ -55,7 +55,7 @@ class LikelihoodAnnotation(object):
         Value for search program accel parameter (speed vs. sensitivity)
     pseudo_count : float
         Value used to dilute the likelihoods of annotations that have weak homology
-         to the query
+        to the query
     separator : str
         Character string not found in any roles and used to split lists of strings
     _dilution_percent : float
@@ -75,7 +75,7 @@ class LikelihoodAnnotation(object):
     _complex_values : dict
         Dictionary keyed by complex ID and likelihood, type, GPR string, list of
         roles not in the organism, and list of roles not in target search database
-         as values
+        as values
     _reaction_values : dict
         Dictionary keyed by reaction ID and likelihood, type, GPR string, and
         complex string as values

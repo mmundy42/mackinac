@@ -16,6 +16,7 @@ Welcome to Mackinac's documentation!
    workspace
    analysis
    configure
+   reconstruct
    mackinac
 
 Indices and tables
