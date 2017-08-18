@@ -4,7 +4,8 @@ requirements = [
     'cobra>=0.5.4',
     'six',
     'requests',
-    'configparser'
+    'configparser',
+    'psamm>=0.31'
 ]
 
 try:

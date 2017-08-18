@@ -5,7 +5,8 @@ from cobra.core import Metabolite, Reaction
 # Required fields in source file for creating a universal metabolite.
 universal_metabolite_fields = {
     'id', 'formula', 'name', 'charge', 'abbreviation', 'source', 'structure',
-    'pka', 'pkb', 'mass', 'deltag', 'deltagerr', 'aliases'
+    'pka', 'pkb', 'mass', 'deltag', 'deltagerr', 'aliases', 'is_core',
+    'is_cofactor', 'is_obsolete', 'linked_compound'
 }
 
 # Required fields in source file for creating a universal reaction.
@@ -13,6 +14,9 @@ universal_reaction_fields = {
     'id', 'name', 'abbreviation', 'code', 'stoichiometry', 'direction', 'reversibility', 'status',
     'deltag', 'deltagerr', 'aliases', 'linked_reaction', 'is_obsolete', 'is_transport'
 }
+
+# Default compartment ID for universal metabolites.
+default_compartment_id = '0'
 
 
 def create_universal_metabolite(fields, names):
@@ -36,12 +40,12 @@ def create_universal_metabolite(fields, names):
         return None
 
     # Create a Metabolite object. All metabolites are placed in the default compartment.
-    # @todo Use a constant for default compartment?
     metabolite = Metabolite(id=fields[names['id']] + '_0',
-                            formula=fields[names['formula']],
                             name=fields[names['name']],
                             charge=float(fields[names['charge']]),
-                            compartment='0')
+                            compartment=default_compartment_id)
+    if fields[names['formula']] != 'null':
+        metabolite.formula = fields[names['formula']]
 
     # Add extended information as notes.
     metabolite.notes['abbreviation'] = fields[names['abbreviation']]
@@ -67,9 +71,9 @@ def create_universal_metabolite(fields, names):
                 warn('Metabolite {0} has an invalid pkb field: {1}'.format(metabolite.id, fields[names['pkb']]))
     if fields[names['mass']] != 'null':
         metabolite.notes['mass'] = float(fields[names['mass']])
-    if fields[names['deltag']] != 'null':
+    if fields[names['deltag']] != 'null' and fields[names['deltag']] != '10000000':
         metabolite.notes['deltag'] = float(fields[names['deltag']])
-    if fields[names['deltagerr']] != 'null':
+    if fields[names['deltagerr']] != 'null' and fields[names['deltagerr']] != '10000000':
         metabolite.notes['deltagerr'] = float(fields[names['deltagerr']])
     if fields[names['aliases']] != 'null':
         metabolite.notes['aliases'] = dict()
@@ -77,6 +81,12 @@ def create_universal_metabolite(fields, names):
         for alias in alias_list:
             parts = alias.split(':')
             metabolite.notes['aliases'][parts[0]] = parts[1]
+    if fields[names['linked_compound']] != 'null':
+        metabolite.notes['linked_ids'] = fields[names['linked_compound']].split(';')
+    else:
+        metabolite.notes['linked_ids'] = None
+    metabolite.notes['is_core'] = True if fields[names['is_core']] == '1' else False
+    metabolite.notes['is_cofactor'] = True if fields[names['is_cofactor']] == '1' else False
     return metabolite
 
 
@@ -126,10 +136,7 @@ def create_universal_reaction(fields, names):
         reaction.notes['linked_ids'] = fields[names['linked_reaction']].split(';')
     else:
         reaction.notes['linked_ids'] = None
-    if fields[names['is_transport']] == '1':
-        reaction.notes['is_transport'] = True
-    else:
-        reaction.notes['is_transport'] = False
+    reaction.notes['is_transport'] = True if fields[names['is_transport']] == '1' else False
 
     return reaction
 

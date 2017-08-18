@@ -2,8 +2,11 @@ from warnings import warn
 import logging
 from collections import defaultdict
 from six import iteritems
+from tempfile import NamedTemporaryFile
 
 from cobra.core import Object, DictList, Model, Gene
+from cobra.io import save_json_model
+from psamm.importers.cobrajson import Importer
 
 from .util import read_source_file, create_boundary
 from .templatecompartment import create_template_compartment, compartment_fields
@@ -496,19 +499,37 @@ class TemplateModel(Object):
                     output[role.id]['reactions'][reaction.id]['complex_id'] = complx.id
         return output
 
-    def to_model(self):
-        """ Make a model of all metabolites and reactions in template model.
-
-        The returned Model object can be used as a "universal" model for gap filling.
+    def to_cobra_model(self):
+        """ Make a COBRA model from the template model.
 
         Returns
         -------
         cobra.core.Model
-            Universal model
+            Template model converted to a COBRA model
         """
 
+        LOGGER.info('Started making cobra Model object from template %s', self.id)
         model = Model(self.id, name=self.name)
         model.add_reactions([rxn.create_model_reaction(self.compartments) for rxn in self.reactions])
         extracellular = model.metabolites.query(lambda x: x == 'e', 'compartment')
         model.add_reactions([create_boundary(met) for met in extracellular])
+        LOGGER.info('Finished making cobra Model object from template %s', self.id)
+        return model
+
+    def to_psamm_model(self):
+        """ Make a PSAMM native model from the template model.
+
+        PSAMM can import COBRA json (only from a file object) so first convert to
+        a COBRA model and then use PSAMM importer to do the conversion.
+
+        Returns
+        -------
+        psamm.datasource.native.NativeModel
+            Template model converted to a PSAMM native model
+        """
+
+        with NamedTemporaryFile() as cobra_json:
+            save_json_model(self.to_cobra_model(), cobra_json)
+            cobra_json.seek(0)
+            model = Importer().import_model(cobra_json)
         return model
