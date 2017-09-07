@@ -302,30 +302,30 @@ class LikelihoodAnnotation(object):
                 if value[1] > max_score:
                     max_score = value[1]
 
-            # Second calculate the cumulative squared scores for each possible roleset.
-            # This along with "pseudocount * maxscore" is equivalent to multiplying all scores
-            # by themselves and then dividing by the max score.
-            # This is done to avoid some pathological cases and give more weight to higher-scoring hits
-            # and not let much lower-scoring hits or noise drown them out.
+            # Second calculate the cumulative squared scores for each possible
+            # roleset. This along with "pseudocount * maxscore" is equivalent to
+            # multiplying all scores by themselves and then dividing by the max
+            # score. This is done to avoid some pathological cases and give more
+            # weight to higher-scoring hits and not let much lower-scoring hits
+            # or noise drown them out.
             # Build a dictionary keyed by roleset of the sum of squares of the log-scores.
             # roleset -> sum of squares
-            roleset_scores = dict()
+            roleset_scores = defaultdict(float)
             num_missing_rolesets = 0
             for value in query_scores[query_id]:
                 try:
                     roleset = self._target_rolesets[value[0]]
-                except KeyError:
-                    num_missing_rolesets += 1
-                    raise LikelihoodError('Target id {0} from search results file had no roles in roleset dictionary'
-                                          .format(value[0]))
-                rs_score = float(value[1]) ** 2
-                try:
+                    rs_score = float(value[1]) ** 2
                     roleset_scores[roleset] += rs_score
                 except KeyError:
-                    roleset_scores[roleset] = rs_score
+                    num_missing_rolesets += 1
+                    LOGGER.warn('Target feature id {0} from search results file was not found in roleset dictionary'
+                                .format(value[0]))
 
             if num_missing_rolesets > 0:
-                warn('{0} target rolesets missing from dictionary'.format(num_missing_rolesets))
+                warn('{0} feature IDs not found in target rolesets dictionary (most likely caused by '
+                     'mismatch between protein fasta file and feature ID to role ID mapping file'
+                     .format(num_missing_rolesets))
 
             # Third calculate the likelihood that this feature has the given functional annotation.
             # Start with the denominator which is the sum of squares of the log-scores for
@@ -781,7 +781,7 @@ def download_data_files(fid_role_path, protein_sequence_path, search_db_path, se
                 details = '"%s" failed with return code %d:\nCommand: "%s"\nStdout: "%s"\nStderr: "%s"' \
                           % (args[0], proc.returncode, cmd, stdout, stderr)
                 raise LikelihoodError(details)
-    except Exception as e:
+    except OSError as e:
         warn('Failed to run "%s": %s' % (cmd, e.strerror))
         raise
 
