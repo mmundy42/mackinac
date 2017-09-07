@@ -415,7 +415,7 @@ class TemplateModel(Object):
         # Add a magic exchange reaction for the special biomass metabolite which seems to be
         # required for ModelSEED models and which we know has id "cpd11416_c".
         # @todo Move this since it is specific to ModelSEED?
-        model.add_reactions([create_boundary(self.metabolites.get_by_id('cpd11416_c'), type='sink')])
+        # model.add_reactions([create_boundary(self.metabolites.get_by_id('cpd11416_c'), type='sink')])
 
         # Create a biomass reaction, add it to the model, and make it the objective.
         LOGGER.info('Started adding biomass reaction')
@@ -426,6 +426,10 @@ class TemplateModel(Object):
         model.add_reactions([biomass_reaction])
         biomass_reaction.objective_coefficient = 1.0
         LOGGER.info('Finished adding biomass reaction {0} as objective'.format(biomass_reaction.id))
+
+        # Add compartments to the model (this is fixed in a future version of cobra).
+        for compartment in self.compartments:
+            model.compartments[compartment.model_id] = compartment.name
 
         return model
 
@@ -499,8 +503,16 @@ class TemplateModel(Object):
                     output[role.id]['reactions'][reaction.id]['complex_id'] = complx.id
         return output
 
-    def to_cobra_model(self):
+    def to_cobra_model(self, reversible=False):
         """ Make a COBRA model from the template model.
+
+        The returned model includes exchange reactions for all metabolites in the
+        extracellular compartment (which is assumed to have compartment ID 'e').
+
+        Parameters
+        ----------
+        reversible : bool, optional
+            When True, all reactions in returned model are reversible
 
         Returns
         -------
@@ -511,6 +523,9 @@ class TemplateModel(Object):
         LOGGER.info('Started making cobra Model object from template %s', self.id)
         model = Model(self.id, name=self.name)
         model.add_reactions([rxn.create_model_reaction(self.compartments) for rxn in self.reactions])
+        if reversible:
+            for rxn in model.reactions:
+                rxn.bounds = (-1000.0, 1000.0)
         extracellular = model.metabolites.query(lambda x: x == 'e', 'compartment')
         model.add_reactions([create_boundary(met) for met in extracellular])
         LOGGER.info('Finished making cobra Model object from template %s', self.id)
