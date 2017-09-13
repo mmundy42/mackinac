@@ -45,7 +45,7 @@ negbio	cpd00099_0	-1.0	MOLSPLIT	cofactor	null	c
 negbio	cpd00149_0	-1.0	MOLSPLIT	cofactor	null	c
 negbio	cpd00058_0	-1.0	MOLSPLIT	cofactor	null	c
 negbio	cpd00015_0	-1.0	MOLSPLIT	cofactor	null	c
-negbio	cpd10515_0	-1.0	MOLSPLIT	cofactor	null	c
+negbio	cpd00021_0	-1.0	MOLSPLIT	cofactor	null	c
 negbio	cpd00030_0	-1.0	MOLSPLIT	cofactor	null	c
 negbio	cpd00048_0	-1.0	MOLSPLIT	cofactor	null	c
 negbio	cpd00034_0	-1.0	MOLSPLIT	cofactor	null	c
@@ -123,7 +123,7 @@ posbio	cpd00099_0	-1.0	MOLSPLIT	cofactor	null	c
 posbio	cpd00149_0	-1.0	MOLSPLIT	cofactor	null	c
 posbio	cpd00058_0	-1.0	MOLSPLIT	cofactor	null	c
 posbio	cpd00015_0	-1.0	MOLSPLIT	cofactor	null	c
-posbio	cpd10515_0	-1.0	MOLSPLIT	cofactor	null	c
+posbio	cpd00021_0	-1.0	MOLSPLIT	cofactor	null	c
 posbio	cpd00030_0	-1.0	MOLSPLIT	cofactor	null	c
 posbio	cpd00048_0	-1.0	MOLSPLIT	cofactor	null	c
 posbio	cpd00034_0	-1.0	MOLSPLIT	cofactor	null	c
