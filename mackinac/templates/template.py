@@ -55,10 +55,10 @@ def create_mackinac_template_model(universal_folder, template_folder, id, name, 
     # Create an empty template model and initialize it from source files.
     template_model = TemplateModel(id, name, type, domain)
     template_model.init_from_files(
-        join(template_folder, 'Compartments.tsv'),
-        join(template_folder, 'Biomasses.tsv'),
-        join(template_folder, 'BiomassCompounds.tsv'),
-        join(template_folder, 'Reactions.tsv'),
+        join(template_folder, 'compartments.tsv'),
+        join(template_folder, 'biomasses.tsv'),
+        join(template_folder, 'biomasscompounds.tsv'),
+        join(template_folder, 'reactions.tsv'),
         join(universal_folder, 'Complexes.tsv'),
         join(universal_folder, 'Roles.tsv'),
         universal_metabolites,
