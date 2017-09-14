@@ -12,10 +12,11 @@ def create_mackinac_template_model(universal_folder, template_folder, id, name, 
                                    domain='Bacteria', verbose=False, validate=False):
     """ Create a template model object from ModelSEED source files.
     
-    The universal folder must contain these files: (1) "reactions.tsv", (2)
-    "metabolites.tsv", (3) "roles.tsv", and (4) "complexes.tsv". The template
-    folder must contain these files: (1) "compartments.tsv", (2) "biomasses.tsv",
-    (3) "biomass_components.tsv", (4) "reactions.tsv".
+    The universal folder must contain these files: (1) "metabolites.tsv", (2) "reactions.tsv".
+    The template folder must contain these files: (1) "biomass_metabolites.tsv",
+    (2) "biomasses.tsv", (3) "compartments.tsv" , (4) "complexes.tsv", (5) "reactions.tsv",
+    (6) "roles.tsv". Each file has required fields that are needed to create a template
+    model.
     
     Parameters
     ----------
@@ -44,10 +45,10 @@ def create_mackinac_template_model(universal_folder, template_folder, id, name, 
 
     # Get the universal metabolites and reactions by processing the source files.
     # Note that metabolites and reactions marked as obsolete are not included.
-    universal_metabolites = read_source_file(join(universal_folder, 'Metabolites.tsv'),
+    universal_metabolites = read_source_file(join(universal_folder, 'metabolites.tsv'),
                                              universal_metabolite_fields,
                                              create_universal_metabolite)
-    universal_reactions = read_source_file(join(universal_folder, 'Reactions.tsv'),
+    universal_reactions = read_source_file(join(universal_folder, 'reactions.tsv'),
                                            universal_reaction_fields,
                                            create_universal_reaction)
     resolve_universal_reactions(universal_reactions, universal_metabolites, validate)
@@ -57,7 +58,7 @@ def create_mackinac_template_model(universal_folder, template_folder, id, name, 
     template_model.init_from_files(
         join(template_folder, 'compartments.tsv'),
         join(template_folder, 'biomasses.tsv'),
-        join(template_folder, 'biomasscompounds.tsv'),
+        join(template_folder, 'biomass_metabolites.tsv'),
         join(template_folder, 'reactions.tsv'),
         join(template_folder, 'complexes.tsv'),
         join(template_folder, 'roles.tsv'),
