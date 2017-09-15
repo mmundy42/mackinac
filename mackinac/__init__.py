@@ -7,6 +7,6 @@ from .workspace import get_workspace_object_data, get_workspace_object_meta, lis
     put_workspace_object, delete_workspace_object
 from .genome import get_genome_summary, get_genome_features
 from .likelihood import download_data_files
-from .reconstruct import reconstruct_model_from_patric
+from .reconstruct import reconstruct_model_from_patric, reconstruct_model
 from .SeedClient import get_token
 from . import templates
