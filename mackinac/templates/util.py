@@ -96,7 +96,7 @@ def read_source_file(filename, required, creator):
             # Get the object data and create the corresponding object.
             linenum += 1
             fields = line.strip().split('\t')
-            if len(fields) < len(required):
+            if len(fields) < len(names):
                 warn('Skipped object on line {0} because missing one or more fields: {1}'
                      .format(linenum, fields))
                 skipped += 1

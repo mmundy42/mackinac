@@ -141,6 +141,9 @@ class TemplateModel(Object):
             # Get universal reaction for definition, metabolites, and status.
             try:
                 u_rxn = universal_reactions.get_by_id(rxn.id)
+                if u_rxn.notes['is_obsolete']:
+                    u_rxn = universal_reactions.get_by_id(u_rxn.notes['replaced_by'])
+                    # Need logging or stats
             except KeyError:
                 if verbose:
                     warn('Template reaction {0} was not found in universal reactions'.format(rxn.id))
@@ -415,7 +418,7 @@ class TemplateModel(Object):
         # Add a magic exchange reaction for the special biomass metabolite which seems to be
         # required for ModelSEED models and which we know has id "cpd11416_c".
         # @todo Move this since it is specific to ModelSEED?
-        # model.add_reactions([create_boundary(self.metabolites.get_by_id('cpd11416_c'), type='sink')])
+        model.add_reactions([create_boundary(self.metabolites.get_by_id('cpd11416_c'), type='sink')])
 
         # Create a biomass reaction, add it to the model, and make it the objective.
         LOGGER.info('Started adding biomass reaction')
@@ -503,6 +506,17 @@ class TemplateModel(Object):
                     output[role.id]['reactions'][reaction.id]['complex_id'] = complx.id
         return output
 
+    def to_source_files(self, folder):
+        """ Make source files from the template model.
+
+        Parameters
+        ----------
+        folder : str
+            Path to folder containing source files
+        """
+
+        return
+
     def to_cobra_model(self, reversible=False):
         """ Make a COBRA model from the template model.
 
@@ -548,3 +562,10 @@ class TemplateModel(Object):
             cobra_json.seek(0)
             model = Importer().import_model(cobra_json)
         return model
+
+    def to_list_file(self, file_name):
+
+        with open(file_name, 'w') as handle:
+            for rxn in self.reactions:
+                model_rxn = rxn.create_model_reaction(self.compartments)
+                handle.write('{0}: {1}\n'.format(model_rxn.id, model_rxn.reaction))

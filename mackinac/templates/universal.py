@@ -107,7 +107,7 @@ def create_universal_reaction(fields, names):
     """
 
     # If reaction is marked as obsolete or there are no metabolites, skip it.
-    if fields[names['is_obsolete']] == '1' or fields[names['status']] == 'EMPTY':
+    if fields[names['status']] == 'EMPTY':
         return None
 
     # Create a cobra.core.Reaction object. Note that lower bound, upper bound, and
@@ -116,6 +116,10 @@ def create_universal_reaction(fields, names):
     reaction = Reaction(id=fields[names['id']], name=fields[names['name']])
 
     # Add extended information as notes.
+    if fields[names['is_obsolete']] == '1':
+        reaction.notes['is_obsolete'] = True
+    else:
+        reaction.notes['is_obsolete'] = False
     reaction.notes['universal_direction'] = fields[names['direction']]
     reaction.notes['universal_reversibility'] = fields[names['reversibility']]
     reaction.notes['abbreviation'] = fields[names['abbreviation']]
@@ -206,6 +210,24 @@ def resolve_universal_reactions(reactions, metabolites, validate=False, verbose=
                 metabolites.append(model_metabolite)
             reaction_metabolites[model_metabolite] = float(fields[0])
         rxn.add_metabolites(reaction_metabolites)
+
+        # Find the reaction that an obsolete reaction was replaced by.
+        if rxn.notes['is_obsolete']:
+            if rxn.notes['linked_ids']:
+                replaced_by = None
+                for linked_id in rxn.notes['linked_ids']:
+                    try:
+                        linked_rxn = reactions.get_by_id(linked_id)
+                        if not linked_rxn.notes['is_obsolete']:
+                            replaced_by = linked_rxn.id
+                    except KeyError:
+                        warn('Reaction {0} is obsolete and linked reaction {1} not found'.format(rxn.id, linked_id))
+                if replaced_by is not None:
+                    rxn.notes['replaced_by'] = replaced_by
+                else:
+                    warn('Reaction {0} is obsolete and all replacements are obsolete'.format(rxn.id))
+            else:
+                warn('Reaction {0} is obsolete but no replacement is specified'.format(rxn.id))
 
     # If requested, run checks to validate the reactions.
     if validate:
