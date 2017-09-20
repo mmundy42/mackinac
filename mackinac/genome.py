@@ -86,3 +86,69 @@ def get_genome_features(genome_id, annotation='PATRIC'):
             query['start'] += len(feature_data['response']['docs'])
 
     return features
+
+
+def features_to_protein_fasta_file(feature_list, file_name):
+    """ Create a protein fasta file from features with amino acid sequences.
+
+    Parameters
+    ----------
+    feature_list: list
+        List of features (each entry is a dict with keys that vary based on available data)
+    file_name : str
+        Path to output fasta file
+
+    Returns
+    -------
+    int
+        Number of features with amino acid sequences stored in fasta file
+    """
+
+    num_added = 0
+    with open(file_name, 'w') as handle:
+        for feature in feature_list:
+            # Skip the feature if there is no amino acid sequence.
+            if 'aa_sequence' in feature:
+                if feature['annotation'] == 'PATRIC':
+                    aa_id = 'patric_id'
+                elif feature['annotation'] == 'RefSeq':
+                    aa_id = 'protein_id'
+                else:
+                    raise ValueError('Annotation must be either "PATRIC" or "RefSeq"')
+                handle.write('>{0}\n{1}\n'.format(feature[aa_id], feature['aa_sequence']))
+                num_added += 1
+
+    return num_added
+
+
+def features_to_dna_fasta_file(feature_list, file_name):
+    """ Create a DNA fasta file from features with DNA sequences.
+
+    Parameters
+    ----------
+    feature_list: list
+        List of features (each entry is a dict with keys that vary based on available data)
+    file_name : str
+        Path to output fasta file
+
+    Returns
+    -------
+    int
+        Number of features with DNA sequences stored in fasta file
+    """
+
+    num_added = 0
+    with open(file_name, 'w') as handle:
+        for feature in feature_list:
+            # Skip the feature if there is no DNA sequence.
+            if 'na_sequence' in feature:
+                if feature['annotation'] == 'PATRIC':
+                    na_id = 'patric_id'
+                elif feature['annotation'] == 'RefSeq':
+                    na_id = 'refseq_locus_tag'
+                else:
+                    raise ValueError('Annotation must be either "PATRIC" or "RefSeq"')
+                handle.write('>{0}\n{1}\n'.format(feature[na_id], feature['na_sequence']))
+                num_added += 1
+
+    return num_added
