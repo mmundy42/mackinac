@@ -1,5 +1,3 @@
-import cobra
-import re
 import logging
 from warnings import warn
 
@@ -10,9 +8,8 @@ from .likelihood import LikelihoodAnnotation
 LOGGER = logging.getLogger(__name__)
 
 
-def reconstruct_model_from_patric(genome_id, template, biomass_id, search_program_path,
-                                  search_db_path, fid_role_path, solver=None, work_folder=None):
-    """ Reconstruct a model for an organism from a PATRIC genome.
+def reconstruct_model_from_patric(genome_id, template, biomass_id, **kwargs):
+    """ Download a PATRIC genome for an organism and reconstruct a model from a template.
 
     Parameters
     ----------
@@ -22,16 +19,8 @@ def reconstruct_model_from_patric(genome_id, template, biomass_id, search_progra
         Template model for type of organism
     biomass_id : str
         ID of biomass entity in template model used to create biomass objective
-    search_program_path : str
-        Path to search program executable
-    search_db_path : str
-        Path to search database file
-    fid_role_path : str
-        Path to feature ID to role ID mapping file
-    solver : str
-        Name of solver (must be supported by optlang and installed on your system)
-    work_folder : str, optional
-        Path to folder for storing intermediate files
+    kwargs : dict
+        Keyword arguments to pass along to reconstruct_model()
 
     Returns
     -------
@@ -44,50 +33,60 @@ def reconstruct_model_from_patric(genome_id, template, biomass_id, search_progra
     summary = get_genome_summary(genome_id)
     features = get_genome_features(genome_id, 'PATRIC')
     try:
-        gc_content = summary['gc_content']
-        if gc_content > 1.0:
-            gc_content /= 100.0
+        kwargs['gc_content'] = summary['gc_content']
+        if kwargs['gc_content'] > 1.0:
+            kwargs['gc_content'] /= 100.0
     except KeyError:
-        gc_content = 0.5
+        kwargs['gc_content'] = 0.5
         LOGGER.warn('GC content not found in genome summary, using default value of {0}'
-                    .format(gc_content))
+                    .format(kwargs['gc_content']))
     LOGGER.info('Finished download of %d features for genome %s', len(features), genome_id)
 
+    # Reconstruct a model for the organism.
+    model_id = genome_id
+    if 'model_id' in kwargs:
+        model_id = kwargs['model_id']
+    return reconstruct_model(model_id, features, template, biomass_id, kwargs)
 
-def reconstruct_model(model_id, model_name, features, gc_content, template, biomass_id, search_program_path,
-                      search_db_path, fid_role_path, work_folder):
-    """ Reconstruct a model for an organism.
+
+def reconstruct_model(model_id, features, template, biomass_id, model_name=None,
+                      gc_content=0.5, search_program_path='usearch',
+                      search_db_path='protein.udb', fid_role_path='otu_fid_role.tsv',
+                      work_folder=".", cutoff=None):
+    """ Reconstruct a model for an organism from a template model.
 
     Parameters
     ----------
     model_id : str
-        ID of model
-    model_name : str
-        Name of model
+        ID for model
     features : list
         List of genome features from organism
-    gc_content : float
-        Percent GC content in genome of organism
     template : TemplateModel
         Template model for type of organism
     biomass_id : str
         ID of biomass entity in template model used to create biomass objective
-    search_program_path : str
+    model_name : str, optional
+        Name for model
+    gc_content : float, optional
+        Percent GC content in genome of organism (value between 0 and 1)
+    search_program_path : str, optional
         Path to search program executable
-    search_db_path : str
+    search_db_path : str, optional
         Path to search database file
-    fid_role_path : str
+    fid_role_path : str, optional
         Path to feature ID to role ID mapping file
-    work_folder : str
+    work_folder : str, optional
         Path to folder for storing intermediate files
+    cutoff : float, optional
+        Add reactions with a likelihood value greater than or equal to the
+        cutoff (value should be greater than 0 and less than 1).
     """
 
     # Build a draft model for the organism.
-    model = template.reconstruct(model_id, features, biomass_id,
-                                 model_name=model_name,
-                                 gc_content=gc_content,
-                                 annotation='PATRIC')
-    LOGGER.info('Reconstructed draft model with %d reactions, %d metabolites, %d genes',
+    LOGGER.info('Started reconstruction of draft model for %s', model_name)
+    model = template.reconstruct(model_id, features, biomass_id, model_name=model_name,
+                                 gc_content=gc_content, annotation='PATRIC')
+    LOGGER.info('Finished reconstruction of draft model with %d reactions, %d metabolites, %d genes',
                 len(model.reactions), len(model.metabolites), len(model.genes))
 
     # Generate likelihood-based gene annotation for the organism.
@@ -97,21 +96,29 @@ def reconstruct_model(model_id, model_name, features, gc_content, template, biom
                                                 template.reactions_to_complexes)
     LOGGER.info('Finished likelihood-based annotation')
 
-    # Update model with reaction likelihoods. Do this after gap fill?
+    # Update model with reaction likelihoods. Reaction IDs in returned dictionary
+    # are in template model format.
+    num_set = 0
+    num_added = 0
     more_reactions = list()
-    not_found = 0
+    num_not_found = 0
     for rxn_id in reaction_likelihoods:
         template_reaction = template.reactions.get_by_id(rxn_id)
         try:
             reaction = model.reactions.get_by_id(template_reaction.model_id)
             reaction.notes['likelihood'] = reaction_likelihoods[rxn_id]['likelihood']
             reaction.notes['likelihood_str'] = '{0}'.format(reaction.notes['likelihood'])
+            num_set += 1
         except KeyError:
-            not_found += 1
-        if reaction_likelihoods[rxn_id]['likelihood'] >= 0.5 and not model.reactions.has_id(template_reaction.model_id):
-            more_reactions.append(template_reaction.create_model_reaction(template.compartments))
-    model.add_reactions(more_reactions)
-
+            if cutoff is not None and reaction_likelihoods[rxn_id]['likelihood'] >= cutoff:
+                more_reactions.append(template_reaction.create_model_reaction(template.compartments))
+                num_added += 1
+            else:
+                num_not_found += 1
+    if len(more_reactions) > 0:
+        model.add_reactions(more_reactions)
+    LOGGER.info('Set likelihood for %d reactions, added %d reactions, %d reactions not set',
+                num_set, num_added, num_not_found)
     return model
 
 
@@ -142,7 +149,7 @@ def check_boundary_metabolites(model, extracellular='e', to_compartment='c'):
                 warn('Reaction {0} for metabolite {1} is not an exchange reaction'
                      .format(rxn.id, met.name))
             if rxn.lower_bound == 0. or rxn.upper_bound == 0.:
-                warn('Reaction {0} for metabolite {1} has invalid bounds {2}'
+                warn('Exchange reaction {0} for metabolite {1} has invalid bounds {2}'
                      .format(rxn.id, met.name, rxn.bounds))
         except KeyError:
             warn('Exchange reaction missing for metabolite {0} ({1})'.format(met.id, met.name))
@@ -152,7 +159,7 @@ def check_boundary_metabolites(model, extracellular='e', to_compartment='c'):
                 if extracellular in rxn.compartments and to_compartment in rxn.compartments:
                     transport = True
                     if rxn.lower_bound == 0. or rxn.upper_bound == 0.:
-                        warn('Reaction {0} for metabolite {1} has invalid bounds {2}'
+                        warn('Transport reaction {0} for metabolite {1} has invalid bounds {2}'
                              .format(rxn.id, met.name, rxn.bounds))
         if not transport:
             warn('Metabolite {0} ({1}) has no transport reaction to compartment {2}'
@@ -164,40 +171,3 @@ def check_boundary_metabolites(model, extracellular='e', to_compartment='c'):
         warn('{0} metabolites do not have a path from boundary to comparment {1}'
              .format(len(metabolites) - num_valid, to_compartment))
     return num_valid
-
-
-def likelihood_gapfill(model, universal_model, reaction_probabilities, clean_exchange_rxns=True,
-                       default_penalties=None, dm_rxns=False, ex_rxns=False, **solver_parameters):
-    """
-    Gapfill a model using probabilistic weights
-    :param default_penalties:
-    :param model: cobra Model object, the model to be gapfilled
-    :param universal_model: cobra Model object representing the database of reactions to choose from
-    :param reaction_probabilities: reaction_probabilities dictionary
-    :return:
-    """
-    universal_model = universal_model.copy()
-    model = clean_exchange_reactions(model) if clean_exchange_rxns else model.copy()
-    if default_penalties is None:
-        default_penalties = {'Universal': 1, 'Exchange': 100, 'Demand': 1, 'Reverse': 75}
-    penalties = default_penalties
-    reactions_to_remove = []
-    for r in universal_model.reactions:
-        if model.reactions.has_id(r.id):
-            reactions_to_remove.append(r)
-            penalties[r.id] = 0  # In the model
-        elif r.id in reaction_probabilities:
-            penalties[r.id] = max(0, 1 - reaction_probabilities[r.id]) * \
-                              (penalties[r.id] if r.id in penalties else 1)
-    universal_model.remove_reactions(reactions_to_remove)
-    return cobra.flux_analysis.gapfill(model, universal_model, penalties=penalties, demand_reactions=dm_rxns,
-                                       exchange_reactions=ex_rxns, **solver_parameters)
-
-
-def clean_exchange_reactions(model, regex='.*_e([0-9]*)$'):
-    model = model.copy()
-    compound_regex = re.compile(regex)
-    mets_to_clean = [m for m in model.metabolites if compound_regex.match(m.id)]
-    for m in mets_to_clean:
-        m.remove_from_model()
-    return model

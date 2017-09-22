@@ -272,7 +272,7 @@ class TemplateModel(Object):
             Name for draft model of organism
         gc_content : float, optional
             Percent GC content in genome of organism (value between 0 and 1)
-        annotation : {'PATRIC'}
+        annotation : {'PATRIC'}, optional
             Type of annotation in feature data
             
         Returns
