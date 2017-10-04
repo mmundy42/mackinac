@@ -9,24 +9,164 @@ universal_metabolite_fields = {
     'is_cofactor', 'is_obsolete', 'linked_compound'
 }
 
+# Schema for metabolite JSON file.
+metabolite_json_schema = {
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "title": "Universal metabolites",
+    "description": "JSON representation of universal metabolites from ModelSEED",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "object",
+            "properties": {
+                "abbreviation": {"type": "string"},
+                "abstract_compound": {"type": "string"},
+                "aliases": {"type": "string"},
+                "charge": {"type": "string"},
+                "comprised_of": {"type": "string"},
+                "deltag": {"type": "string"},
+                "deltagerr": {"type": "string"},
+                "formula": {"type": "string"},
+                "id": {"type": "string"},
+                "is_cofactor": {"type": "integer"},
+                "is_core": {"type": "integer"},
+                "is_obsolete": {"type": "integer"},
+                "linked_compound": {"type": "string"},
+                "mass": {"type": "string"},
+                "name": {"type": "string"},
+                "pka": {"type": "string"},
+                "pkb": {"type": "string"},
+                "source": {"type": "string"},
+                "structure": {"type": "string"}
+            }
+        }
+    }
+}
+
 # Required fields in source file for creating a universal reaction.
 universal_reaction_fields = {
     'id', 'name', 'abbreviation', 'code', 'stoichiometry', 'direction', 'reversibility', 'status',
     'deltag', 'deltagerr', 'aliases', 'linked_reaction', 'is_obsolete', 'is_transport'
 }
 
+# Schema for reaction JSON file.
+reaction_json_schema = {
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "title": "Universal metabolites",
+    "description": "JSON representation of universal metabolites from ModelSEED",
+    "type": "object",
+    "properties": {
+        "id": {
+            "type": "object",
+            "properties": {
+                "abbreviation": {"type": "string"},
+                "abstract_reaction": {"type": "string"},
+                "aliases": {"type": "string"},
+                "code": {"type": "string"},
+                "comprised_of": {"type": "string"},
+                "compound_ids": {"type": "string"},
+                "definition": {"type": "string"},
+                "deltag": {"type": "string"},
+                "deltagerr": {"type": "string"},
+                "direction": {"type": "string"},
+                "ec_numbers": {"type": "string"},
+                "equation": {"type": "string"},
+                "id": {"type": "string"},
+                "is_obsolete": {"type": "integer"},
+                "is_transport": {"type": "integer"},
+                "linked_reaction": {"type": "string"},
+                "name": {"type": "string"},
+                "notes": {"type": "string"},
+                "pathways": {"type": "string"},
+                "reversibility": {"type": "string"},
+                "status": {"type": "string"},
+                "stoichiometry": {"type": "string"}
+            }
+        }
+    }
+}
+
 # Default compartment ID for universal metabolites.
 default_compartment_id = '0'
 
 
-def create_universal_metabolite(fields, names):
+def create_universal_metabolite(attrs):
+    """ Create a cobra.core.Metabolite object from a dictionary of attributes for a universal metabolite.
+
+    Parameters
+    ----------
+    attrs : dict
+        Dictionary where key is attribute name and value is attribute value
+
+    Returns
+    -------
+    cobra.core.Metabolite
+        Object created from input attributes
+    """
+
+    # If metabolite is marked as obsolete, skip it.
+    if int(attrs['is_obsolete']) == 1:
+        return None
+
+    # Create a Metabolite object. All metabolites are placed in the default compartment.
+    metabolite = Metabolite(id=attrs['id'] + '_0',
+                            name=attrs['name'],
+                            charge=float(attrs['charge']),
+                            compartment=default_compartment_id)
+    if attrs['formula'] != 'null':
+        metabolite.formula = attrs['formula']
+
+    # Add extended information as notes.
+    metabolite.notes['abbreviation'] = attrs['abbreviation']
+    metabolite.notes['source'] = attrs['source']
+    metabolite.notes['structure'] = attrs['structure']
+    if attrs['pka'] != 'null' and attrs['pka'] != '':
+        metabolite.notes['pka'] = dict()
+        pka_list = attrs['pka'].split(';')
+        for pka in pka_list:
+            parts = pka.split(':')
+            try:
+                metabolite.notes['pka'][parts[0]] = float(parts[1])
+            except IndexError:
+                warn('Metabolite {0} has an invalid pka field: {1}'.format(metabolite.id, attrs['pka']))
+    if attrs['pkb'] != 'null' and attrs['pkb'] != '':
+        metabolite.notes['pkb'] = dict()
+        pkb_list = attrs['pkb'].split(';')
+        for pkb in pkb_list:
+            parts = pkb.split(':')
+            try:
+                metabolite.notes['pkb'][parts[0]] = float(parts[1])
+            except IndexError:
+                warn('Metabolite {0} has an invalid pkb field: {1}'.format(metabolite.id, attrs['pkb']))
+    if attrs['mass'] != 'null':
+        metabolite.notes['mass'] = float(attrs['mass'])
+    if attrs['deltag'] != 'null' and attrs['deltag'] != '10000000':
+        metabolite.notes['deltag'] = float(attrs['deltag'])
+    if attrs['deltagerr'] != 'null' and attrs['deltagerr'] != '10000000':
+        metabolite.notes['deltagerr'] = float(attrs['deltagerr'])
+    if attrs['aliases'] != 'null':
+        metabolite.notes['aliases'] = dict()
+        alias_list = attrs['aliases'].split(';')
+        for alias in alias_list:
+            parts = alias.split(':')
+            metabolite.notes['aliases'][parts[0]] = parts[1]
+    if attrs['linked_compound'] != 'null':
+        metabolite.notes['linked_ids'] = attrs['linked_compound'].split(';')
+    else:
+        metabolite.notes['linked_ids'] = None
+    metabolite.notes['is_core'] = True if int(attrs['is_core']) == 1 else False
+    metabolite.notes['is_cofactor'] = True if int(attrs['is_cofactor']) == 1 else False
+    return metabolite
+
+
+def create_universal_metabolite_from_fields(fields, field_names):
     """ Create a cobra.core.Metabolite object from a list of fields for a universal metabolite.
 
     Parameters
     ----------
     fields : list of str
         Each element is a field from a text file defining a universal metabolite
-    names : dict
+    field_names : dict
         Dictionary with field name as key and list index number as value
 
     Returns
@@ -35,69 +175,70 @@ def create_universal_metabolite(fields, names):
         Object created from input fields
     """
 
-    # If metabolite is marked as obsolete, skip it.
-    if fields[names['is_obsolete']] == '1':
+    metabolite_dict = dict()
+    for name in field_names:
+        metabolite_dict[name] = fields[field_names[name]]
+    return create_universal_metabolite(metabolite_dict)
+
+
+def create_universal_reaction(attrs):
+    """ Create a cobra.core.Reaction object from a list of fields for a universal reaction.
+
+    Parameters
+    ----------
+    attrs : dict
+        Dictionary where key is attribute name and value is attribute value
+
+    Returns
+    -------
+    cobra.core.Reaction
+        Object created from input attributes
+    """
+
+    # If reaction has no metabolites, skip it.
+    if attrs['status'] == 'EMPTY':
         return None
 
-    # Create a Metabolite object. All metabolites are placed in the default compartment.
-    metabolite = Metabolite(id=fields[names['id']] + '_0',
-                            name=fields[names['name']],
-                            charge=float(fields[names['charge']]),
-                            compartment=default_compartment_id)
-    if fields[names['formula']] != 'null':
-        metabolite.formula = fields[names['formula']]
+    # Create a cobra.core.Reaction object. Note that lower bound, upper bound, and
+    # metabolites need to be set later using the data stored in the "stoichiometry"
+    # note and the complete list of universal metabolites.
+    reaction = Reaction(id=attrs['id'], name=attrs['name'])
 
     # Add extended information as notes.
-    metabolite.notes['abbreviation'] = fields[names['abbreviation']]
-    metabolite.notes['source'] = fields[names['source']]
-    metabolite.notes['structure'] = fields[names['structure']]
-    if fields[names['pka']] != 'null' and fields[names['pka']] != '':
-        metabolite.notes['pka'] = dict()
-        pka_list = fields[names['pka']].split(';')
-        for pka in pka_list:
-            parts = pka.split(':')
-            try:
-                metabolite.notes['pka'][parts[0]] = float(parts[1])
-            except IndexError:
-                warn('Metabolite {0} has an invalid pka field: {1}'.format(metabolite.id, fields[names['pka']]))
-    if fields[names['pkb']] != 'null' and fields[names['pkb']] != '':
-        metabolite.notes['pkb'] = dict()
-        pkb_list = fields[names['pkb']].split(';')
-        for pkb in pkb_list:
-            parts = pkb.split(':')
-            try:
-                metabolite.notes['pkb'][parts[0]] = float(parts[1])
-            except IndexError:
-                warn('Metabolite {0} has an invalid pkb field: {1}'.format(metabolite.id, fields[names['pkb']]))
-    if fields[names['mass']] != 'null':
-        metabolite.notes['mass'] = float(fields[names['mass']])
-    if fields[names['deltag']] != 'null' and fields[names['deltag']] != '10000000':
-        metabolite.notes['deltag'] = float(fields[names['deltag']])
-    if fields[names['deltagerr']] != 'null' and fields[names['deltagerr']] != '10000000':
-        metabolite.notes['deltagerr'] = float(fields[names['deltagerr']])
-    if fields[names['aliases']] != 'null':
-        metabolite.notes['aliases'] = dict()
-        alias_list = fields[names['aliases']].split(';')
+    reaction.notes['is_obsolete'] = True if int(attrs['is_obsolete']) == 1 else False
+    reaction.notes['universal_direction'] = attrs['direction']
+    reaction.notes['universal_reversibility'] = attrs['reversibility']
+    reaction.notes['abbreviation'] = attrs['abbreviation']
+    reaction.notes['code'] = attrs['code']
+    reaction.notes['stoichiometry'] = attrs['stoichiometry']
+    reaction.notes['status'] = attrs['status']
+    if attrs['deltag'] != 'null':
+        reaction.notes['deltag'] = float(attrs['deltag'])
+    if attrs['deltagerr'] != 'null':
+        reaction.notes['deltagerr'] = float(attrs['deltagerr'])
+    if attrs['aliases'] != 'null':
+        reaction.notes['aliases'] = dict()
+        alias_list = attrs['aliases'].split(';')
         for alias in alias_list:
             parts = alias.split(':')
-            metabolite.notes['aliases'][parts[0]] = parts[1]
-    if fields[names['linked_compound']] != 'null':
-        metabolite.notes['linked_ids'] = fields[names['linked_compound']].split(';')
+            reaction.notes['aliases'][parts[0]] = parts[1]
+    if attrs['linked_reaction'] != 'null':
+        reaction.notes['linked_ids'] = attrs['linked_reaction'].split(';')
     else:
-        metabolite.notes['linked_ids'] = None
-    metabolite.notes['is_core'] = True if fields[names['is_core']] == '1' else False
-    metabolite.notes['is_cofactor'] = True if fields[names['is_cofactor']] == '1' else False
-    return metabolite
+        reaction.notes['linked_ids'] = None
+    reaction.notes['is_transport'] = True if int(attrs['is_transport']) == 1 else False
+
+    return reaction
 
 
-def create_universal_reaction(fields, names):
+def create_universal_reaction_from_fields(fields, field_names):
     """ Create a cobra.core.Reaction object from a list of fields for a universal reaction.
 
     Parameters
     ----------
     fields : list of str
         Each element is a field from a text file defining a universal reaction
-    names : dict
+    field_names : dict
         Dictionary with field name as key and list index number as value
 
     Returns
@@ -106,43 +247,10 @@ def create_universal_reaction(fields, names):
         Object created from input fields
     """
 
-    # If reaction is marked as obsolete or there are no metabolites, skip it.
-    if fields[names['status']] == 'EMPTY':
-        return None
-
-    # Create a cobra.core.Reaction object. Note that lower bound, upper bound, and
-    # metabolites need to be set later using the data stored in the "stoichiometry"
-    # note and the complete list of universal metabolites.
-    reaction = Reaction(id=fields[names['id']], name=fields[names['name']])
-
-    # Add extended information as notes.
-    if fields[names['is_obsolete']] == '1':
-        reaction.notes['is_obsolete'] = True
-    else:
-        reaction.notes['is_obsolete'] = False
-    reaction.notes['universal_direction'] = fields[names['direction']]
-    reaction.notes['universal_reversibility'] = fields[names['reversibility']]
-    reaction.notes['abbreviation'] = fields[names['abbreviation']]
-    reaction.notes['code'] = fields[names['code']]
-    reaction.notes['stoichiometry'] = fields[names['stoichiometry']]
-    reaction.notes['status'] = fields[names['status']]
-    if fields[names['deltag']] != 'null':
-        reaction.notes['deltag'] = float(fields[names['deltag']])
-    if fields[names['deltagerr']] != 'null':
-        reaction.notes['deltagerr'] = float(fields[names['deltagerr']])
-    if fields[names['aliases']] != 'null':
-        reaction.notes['aliases'] = dict()
-        alias_list = fields[names['aliases']].split(';')
-        for alias in alias_list:
-            parts = alias.split(':')
-            reaction.notes['aliases'][parts[0]] = parts[1]
-    if fields[names['linked_reaction']] != 'null':
-        reaction.notes['linked_ids'] = fields[names['linked_reaction']].split(';')
-    else:
-        reaction.notes['linked_ids'] = None
-    reaction.notes['is_transport'] = True if fields[names['is_transport']] == '1' else False
-
-    return reaction
+    reaction_dict = dict()
+    for name in field_names:
+        reaction_dict[name] = fields[field_names[name]]
+    return create_universal_reaction(reaction_dict)
 
 
 def resolve_universal_reactions(reactions, metabolites, validate=False, verbose=False):

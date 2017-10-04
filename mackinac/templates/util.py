@@ -1,5 +1,7 @@
 from warnings import warn
 import re
+import json
+import jsonschema
 
 from cobra.core import DictList, Reaction
 
@@ -56,6 +58,51 @@ def validate_header(fields, required):
             raise ValueError('Required field {0} is missing from header line'.format(req))
 
     return names
+
+
+def read_json_file(file_name, schema, creator):
+    """ Read a JSON file that defines a collection of objects.
+
+    Each element in the JSON file is an object with an ID property and properties
+    that define the object. The JSON data is validated against the provided schema.
+
+    The creator function must accept one input parameter: (1) a dictionary that
+    maps object attributes to their values.
+
+    Parameters
+    ----------
+    file_name : str
+        Path to JSON file
+    schema : dict
+        JSON schema to validate data from file
+    creator : function
+        Function that creates an object defined in the file
+
+    Returns
+    -------
+    cobra.core.DictList
+        Each entry in the list is an object created by the creator function
+    """
+
+    # Load the JSON file and confirm that it matches the schema.
+    object_data = json.load(open(file_name, 'r'))
+    jsonschema.validate(object_data, schema)
+
+    # Get the object attributes and create the corresponding object.
+    object_list = DictList()
+    skipped = 0
+    for object_id in object_data:
+        if object_list.has_id(object_id):
+            raise DuplicateError('Object with ID {0} is a duplicate'.format(object_id))
+        new_object = creator(object_data[object_id])
+        if new_object is not None:
+            object_list.append(new_object)
+        else:
+            skipped += 1
+
+    if skipped > 0:
+        warn('{0} objects in "{1}" were skipped because object could not be created'.format(skipped, file_name))
+    return object_list
 
 
 def read_source_file(filename, required, creator):
