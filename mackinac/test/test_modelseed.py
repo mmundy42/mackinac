@@ -3,6 +3,7 @@ import pytest
 import mackinac
 
 
+@pytest.mark.skip(reason='ModelSEED server is currently broken')
 @pytest.mark.usefixtures('authenticate')
 class TestModelseedBacteroidesThetaiotaomicron:
 

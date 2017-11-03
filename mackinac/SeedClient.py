@@ -227,6 +227,10 @@ def handle_server_error(e, references=None):
             msg = 'An object reference is not a valid path: {0}'.format(reference_string)
             raise ObjectNotFoundError(msg, e.data)
 
+        if 'Invalid date format:' in e.message:
+            msg = 'An object was not found in workspace: {0}'.format(reference_string)
+            raise ObjectNotFoundError(msg, e.data)
+
         if 'No gap filling needed on specified condition' in e.message:
             raise DuplicateGapfillError('Gap fill solution already available for specified media')
 
@@ -273,8 +277,8 @@ class SeedClient(object):
         ----------
         method: str
             Name of server method
-        params : dict
-            Dictionary of input parameters for method
+        params : dict or list
+            Input parameters for method
         timeout : integer
             Number of seconds to wait for response
 

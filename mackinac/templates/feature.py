@@ -5,7 +5,7 @@ import logging
 from cobra.core import Object, DictList
 
 from .util import make_search_name, ec_number_re
-from ..modelseed import patric_gene_prefix_re
+from ..modelutil import patric_gene_prefix_re
 
 
 # Logger for this module

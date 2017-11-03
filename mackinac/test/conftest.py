@@ -27,7 +27,7 @@ def b_theta_genome_id():
 
 @pytest.fixture(scope='session')
 def b_theta_id():
-    return '226186.12-pytest'
+    return 'Btheta-pytest'
 
 
 @pytest.fixture(scope='session')

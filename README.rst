@@ -188,6 +188,9 @@ Version 0.8.6 (July XX, 2017)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 * Changed documentation to Read the Docs format and configured build with Sphinx
+* Added documentation for configuring and running model reconstruction from a template
+* Fixed get_modelseed_gapfill_solutions() to convert ID type of reactions to match
+  conversion done by create_cobra_model_from_modelseed_model().
 
 Version 0.8.5 (July 20, 2017)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

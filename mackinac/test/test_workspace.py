@@ -6,9 +6,9 @@ import mackinac
 @pytest.fixture(scope='module')
 def test_model(b_theta_genome_id, b_theta_id):
     # Reconstruct a model so there is a folder in the workspace.
-    stats = mackinac.reconstruct_modelseed_model(b_theta_genome_id, model_id=b_theta_id)
+    stats = mackinac.create_patric_model(b_theta_genome_id, model_id=b_theta_id)
     yield stats
-    mackinac.delete_modelseed_model(b_theta_id)
+    mackinac.delete_patric_model(b_theta_id)
 
 
 @pytest.fixture(scope='module')
@@ -34,19 +34,19 @@ class TestWorkspace:
 
     def test_list_objects(self, test_model):
         output = mackinac.list_workspace_objects(test_model['ref'])
-        assert len(output) == 8
+        assert len(output) == 13
         assert len(output[0]) == 12
 
     def test_list_objects_by_name(self, test_model):
         output = mackinac.list_workspace_objects(test_model['ref'], sort_key='name')
-        assert len(output) == 8
+        assert len(output) == 13
         assert output[0][0] == '{0}.cpdtbl'.format(test_model['id'])
 
     def test_list_objects_by_type(self, test_model):
         output = mackinac.list_workspace_objects(test_model['ref'], sort_key='type')
-        assert len(output) == 8
-        assert output[2][1] == 'genome'
-        assert output[4][1] == 'model'
+        assert len(output) == 13
+        assert output[4][1] == 'genome'
+        assert output[5][1] == 'model'
 
     def test_list_objects_bad_folder(self):
         # This fails because there is no leading forward slash.
@@ -66,8 +66,8 @@ class TestWorkspace:
     def test_get_object_meta(self, test_model):
         output = mackinac.get_workspace_object_meta(test_model['ref'])
         assert len(output) == 12
-        assert output[0] == test_model['id']
-        assert output[1] == 'modelfolder'
+        assert output[0] == '.' + test_model['id']
+        assert output[1] == 'folder'
         assert output[8]['is_folder'] == 1
 
     def test_get_object_meta_bad_ref(self):
@@ -78,7 +78,7 @@ class TestWorkspace:
     def test_get_object_data_json(self, test_model):
         reference = '{0}/model'.format(test_model['ref'])
         output = mackinac.get_workspace_object_data(reference)
-        assert output['id'] == test_model['id']
+        assert output['id'] == '.' + test_model['id']
         assert len(output['modelcompartments']) == 2
         assert 'modelcompounds' in output
         assert 'modelreactions' in output

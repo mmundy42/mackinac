@@ -9,5 +9,8 @@ from .genome import get_genome_summary, get_genome_features, features_to_protein
     features_to_dna_fasta_file
 from .likelihood import download_data_files
 from .reconstruct import reconstruct_model_from_patric, reconstruct_model, check_boundary_metabolites
+from .patric import check_patric_app_service, list_patric_apps, create_patric_model, \
+    create_cobra_model_from_patric_model, calculate_patric_likelihoods, delete_patric_model, \
+    get_patric_model_stats
 from .SeedClient import get_token
 from . import templates
