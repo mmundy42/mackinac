@@ -29,25 +29,6 @@ model_folder = 'modelseed'
 LOGGER = logging.getLogger(__name__)
 
 
-def _make_modelseed_reference(name):
-    """ Make a workspace reference to an object.
-
-    Parameters
-    ----------
-    name : str
-        Name of object
-
-    Returns
-    -------
-    str
-        Reference to object in user's model folder
-    """
-
-    if ms_client.username is None:
-        ms_client.set_authentication_token()
-    return '/{0}/{1}/{2}'.format(ms_client.username, model_folder, name)
-
-
 def calculate_modelseed_likelihoods(model_id, search_program_path, search_db_path, fid_role_path, work_folder):
     """ Calculate reaction likelihoods for a ModelSEED model.
 
@@ -77,6 +58,132 @@ def calculate_modelseed_likelihoods(model_id, search_program_path, search_db_pat
 
     return calculate_likelihoods(_make_modelseed_reference(model_id), search_program_path, search_db_path,
                                  fid_role_path, work_folder)
+
+
+def create_cobra_model_from_modelseed_model(model_id, id_type='modelseed', validate=False):
+    """ Create a COBRA model from a ModelSEED model.
+
+    Parameters
+    ----------
+    model_id : str
+        ID of model
+    id_type : {'modelseed', 'bigg'}
+        Type of IDs ('modelseed' for _c or 'bigg' for '[c])
+    validate : bool
+        When True, check for common problems
+
+    Returns
+    -------
+    cobra.core.Model
+        Model object
+    """
+
+    return create_cobra_model(_make_modelseed_reference(model_id), id_type=id_type, validate=validate)
+
+
+def create_universal_model(template_reference, id_type='modelseed'):
+    """ Create a universal model from a ModelSEED template model.
+
+        A template model has all of the reactions and metabolites that are available for
+        inclusion in a model. There are different template models for different types
+        of organisms (e.g. gram negative bacteria). Use an universal model as input to
+        one of the gap fill functions.
+
+    Parameters
+    ----------
+    template_reference : str
+        Workspace reference to template model
+    id_type : {'modelseed', 'bigg'}, optional
+        Type of IDs ('modelseed' for _c or 'bigg' for '[c])
+
+    Returns
+    -------
+    cobra.core.Model
+        Model object with all reactions for models of a type of organism
+    """
+
+    # Get the template model data from the workspace object.
+    data = get_workspace_object_data(template_reference)
+
+    # Create a dict to look up compounds.
+    compound_index = dict()
+    for index in range(len(data['compounds'])):
+        key = '~/compounds/id/{0}'.format(data['compounds'][index]['id'])
+        compound_index[key] = index
+
+    # Create a new COBRApy Model object.
+    model = Model(data['id'], name=data['name'])
+
+    # Add template compartments to the universal model.
+    LOGGER.info('Started adding %d compartments from template model', len(data['compartments']))
+    for index in range(len(data['compartments'])):
+        modelseed_compartment = data['compartments'][index]
+        model.compartments[modelseed_compartment['id']] = modelseed_compartment['name']
+    LOGGER.info('Finished adding %d compartments to model', len(model.compartments))
+
+    # Create Metabolite objects for all of the compounds in the template model. Metabolite
+    # data is split between the "compcompounds" (compounds in a compartment) and the
+    # "compounds" lists.
+    LOGGER.info('Started adding %d metabolites from template model', len(data['compcompounds']))
+    all_metabolites = list()
+    for compcompound in data['compcompounds']:
+        compound = data['compounds'][compound_index[compcompound['templatecompound_ref']]]
+        cobra_id = convert_suffix(compcompound['id'], id_type)
+        metabolite = Metabolite(id=cobra_id,
+                                formula=compound['formula'],
+                                name=compound['name'],
+                                charge=compcompound['charge'],
+                                compartment=compcompound['templatecompartment_ref'].split('/')[-1])
+        all_metabolites.append(metabolite)
+    model.add_metabolites(all_metabolites)
+    LOGGER.info('Finished adding %d metabolites to model', len(model.metabolites))
+
+    # Create Reaction objects for all of the reactions in the template model.
+    LOGGER.info('Started adding %d reactions from template model', len(data['reactions']))
+    all_reactions = list()
+    for template_reaction in data['reactions']:
+        # Set upper and lower bounds based directionality. Switch reverse reactions to
+        # forward reactions.
+        reverse = 1.0
+        if template_reaction['direction'] == '=':
+            lower_bound = -1000.0
+            upper_bound = 1000.0
+        elif template_reaction['direction'] == '>':
+            lower_bound = 0.0
+            upper_bound = 1000.0
+        elif template_reaction['direction'] == '<':
+            lower_bound = 0.0
+            upper_bound = 1000.0
+            reverse = -1.0
+        else:
+            warn('Reaction direction {0} assumed to be reversible for reaction {1}'
+                 .format(template_reaction['direction'], template_reaction['id']))
+            lower_bound = -1000.0
+            upper_bound = 1000.0
+
+        # Create the Reaction object.
+        reaction = Reaction(id=convert_suffix(template_reaction['id'], id_type),
+                            name=template_reaction['name'],
+                            lower_bound=lower_bound,
+                            upper_bound=upper_bound)
+
+        # Create dictionary of metabolites and add them to the reaction.
+        metabolites = dict()
+        for reagent in template_reaction['templateReactionReagents']:
+            cobra_metabolite_id = convert_suffix(reagent['templatecompcompound_ref'].split('/')[-1], id_type)
+            metabolite = model.metabolites.get_by_id(cobra_metabolite_id)
+            metabolites[metabolite] = float(reagent['coefficient']) * reverse
+        reaction.add_metabolites(metabolites)
+
+        # Add a note with the ModelSEED reaction type (universal, spontaneous, conditional, or gapfilling).
+        reaction.notes['type'] = template_reaction['type']
+        all_reactions.append(reaction)
+
+    # Finally, add all of the reactions to the model.
+    model.add_reactions(all_reactions)
+    LOGGER.info('Finished adding %d reactions to model', len(model.reactions))
+
+    return model
 
 
 def delete_modelseed_model(model_id):
@@ -338,132 +445,6 @@ def list_modelseed_models(base_folder=None, sort_key='rundate', print_output=Fal
     return None
 
 
-def create_cobra_model_from_modelseed_model(model_id, id_type='modelseed', validate=False):
-    """ Create a COBRA model from a ModelSEED model.
-
-    Parameters
-    ----------
-    model_id : str
-        ID of model
-    id_type : {'modelseed', 'bigg'}
-        Type of IDs ('modelseed' for _c or 'bigg' for '[c])
-    validate : bool
-        When True, check for common problems
-
-    Returns
-    -------
-    cobra.core.Model
-        Model object
-    """
-
-    return create_cobra_model(_make_modelseed_reference(model_id), id_type=id_type, validate=validate)
-
-
-def create_universal_model(template_reference, id_type='modelseed'):
-    """ Create a universal model from a ModelSEED template model.
-
-        A template model has all of the reactions and metabolites that are available for
-        inclusion in a model. There are different template models for different types
-        of organisms (e.g. gram negative bacteria). Use an universal model as input to
-        one of the gap fill functions.
-
-    Parameters
-    ----------
-    template_reference : str
-        Workspace reference to template model
-    id_type : {'modelseed', 'bigg'}, optional
-        Type of IDs ('modelseed' for _c or 'bigg' for '[c])
-
-    Returns
-    -------
-    cobra.core.Model
-        Model object with all reactions for models of a type of organism
-    """
-
-    # Get the template model data from the workspace object.
-    data = get_workspace_object_data(template_reference)
-
-    # Create a dict to look up compounds.
-    compound_index = dict()
-    for index in range(len(data['compounds'])):
-        key = '~/compounds/id/{0}'.format(data['compounds'][index]['id'])
-        compound_index[key] = index
-
-    # Create a new COBRApy Model object.
-    model = Model(data['id'], name=data['name'])
-
-    # Add template compartments to the universal model.
-    LOGGER.info('Started adding %d compartments from template model', len(data['compartments']))
-    for index in range(len(data['compartments'])):
-        modelseed_compartment = data['compartments'][index]
-        model.compartments[modelseed_compartment['id']] = modelseed_compartment['name']
-    LOGGER.info('Finished adding %d compartments to model', len(model.compartments))
-
-    # Create Metabolite objects for all of the compounds in the template model. Metabolite
-    # data is split between the "compcompounds" (compounds in a compartment) and the
-    # "compounds" lists.
-    LOGGER.info('Started adding %d metabolites from template model', len(data['compcompounds']))
-    all_metabolites = list()
-    for compcompound in data['compcompounds']:
-        compound = data['compounds'][compound_index[compcompound['templatecompound_ref']]]
-        cobra_id = convert_suffix(compcompound['id'], id_type)
-        metabolite = Metabolite(id=cobra_id,
-                                formula=compound['formula'],
-                                name=compound['name'],
-                                charge=compcompound['charge'],
-                                compartment=compcompound['templatecompartment_ref'].split('/')[-1])
-        all_metabolites.append(metabolite)
-    model.add_metabolites(all_metabolites)
-    LOGGER.info('Finished adding %d metabolites to model', len(model.metabolites))
-
-    # Create Reaction objects for all of the reactions in the template model.
-    LOGGER.info('Started adding %d reactions from template model', len(data['reactions']))
-    all_reactions = list()
-    for template_reaction in data['reactions']:
-        # Set upper and lower bounds based directionality. Switch reverse reactions to
-        # forward reactions.
-        reverse = 1.0
-        if template_reaction['direction'] == '=':
-            lower_bound = -1000.0
-            upper_bound = 1000.0
-        elif template_reaction['direction'] == '>':
-            lower_bound = 0.0
-            upper_bound = 1000.0
-        elif template_reaction['direction'] == '<':
-            lower_bound = 0.0
-            upper_bound = 1000.0
-            reverse = -1.0
-        else:
-            warn('Reaction direction {0} assumed to be reversible for reaction {1}'
-                 .format(template_reaction['direction'], template_reaction['id']))
-            lower_bound = -1000.0
-            upper_bound = 1000.0
-
-        # Create the Reaction object.
-        reaction = Reaction(id=convert_suffix(template_reaction['id'], id_type),
-                            name=template_reaction['name'],
-                            lower_bound=lower_bound,
-                            upper_bound=upper_bound)
-
-        # Create dictionary of metabolites and add them to the reaction.
-        metabolites = dict()
-        for reagent in template_reaction['templateReactionReagents']:
-            cobra_metabolite_id = convert_suffix(reagent['templatecompcompound_ref'].split('/')[-1], id_type)
-            metabolite = model.metabolites.get_by_id(cobra_metabolite_id)
-            metabolites[metabolite] = float(reagent['coefficient']) * reverse
-        reaction.add_metabolites(metabolites)
-
-        # Add a note with the ModelSEED reaction type (universal, spontaneous, conditional, or gapfilling).
-        reaction.notes['type'] = template_reaction['type']
-        all_reactions.append(reaction)
-
-    # Finally, add all of the reactions to the model.
-    model.add_reactions(all_reactions)
-    LOGGER.info('Finished adding %d reactions to model', len(model.reactions))
-
-    return model
-
-
 def optimize_modelseed_model(model_id, media_reference=None):
     """ Run flux balance analysis on a ModelSEED model.
 
@@ -704,6 +685,25 @@ def save_modelseed_template_model(template_reference, template_folder):
             c_handle.write('\n'.join(c_lines) + '\n')
 
     return
+
+
+def _make_modelseed_reference(name):
+    """ Make a workspace reference to an object.
+
+    Parameters
+    ----------
+    name : str
+        Name of object
+
+    Returns
+    -------
+    str
+        Reference to object in user's model folder
+    """
+
+    if ms_client.username is None:
+        ms_client.set_authentication_token()
+    return '/{0}/{1}/{2}'.format(ms_client.username, model_folder, name)
 
 
 def _wait_for_job(job_id):
