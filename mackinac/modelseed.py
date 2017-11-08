@@ -4,6 +4,7 @@ from operator import itemgetter
 from warnings import warn
 import re
 import logging
+from os.path import join
 
 from cobra import Model, Reaction, Metabolite
 
@@ -588,6 +589,121 @@ def reconstruct_modelseed_model(genome_id, source='patric', template_reference=N
     if stats['num_genes'] == 0:  # ModelSEED does not return an error if the genome ID is invalid
         warn('Model for genome ID {0} has no genes, verify genome ID is valid'.format(genome_id))
     return stats
+
+
+def save_modelseed_template_model(template_reference, template_folder):
+    """ Save a ModelSEED template model to source file format.
+
+    Parameters
+    ----------
+    template_reference : str
+        Workspace reference to template model
+    template_folder : str
+        Path to folder for storing files with template data
+    """
+
+    # Get the template model data from the workspace object.
+    data = get_workspace_object_data(template_reference)
+
+    # Convert roles to source file format and store in file.
+    with open(join(template_folder, 'roles.tsv'), 'w') as handle:
+        handle.write('\t'.join(['id', 'name', 'source', 'features', 'aliases']) + '\n')
+        data['roles'].sort(key=itemgetter('id'))
+        lines = list()
+        for index in range(len(data['roles'])):
+            item = data['roles'][index]
+            features = 'null'
+            if len(item['features']) > 0:
+                features = ';'.join(item['features'])
+            aliases = 'null'  # Aliases are not currently valid
+            lines.append('\t'.join([item['id'], item['name'], item['source'], features, aliases]))
+        handle.write('\n'.join(lines) + '\n')
+
+    # Convert complexes to source file format and store in file.
+    with open(join(template_folder, 'complexes.tsv'), 'w') as handle:
+        handle.write('\t'.join(['id', 'name', 'source', 'reference', 'confidence', 'roles']) + '\n')
+        data['complexes'].sort(key=itemgetter('id'))
+        lines = list()
+        for index in range(len(data['complexes'])):
+            item = data['complexes'][index]
+            complexrole = 'null'
+            if len(item['complexroles']) > 0:
+                # Note that second field can also be "involved" but that info is lost when
+                # building a template model.
+                complexrole = '|'.join([';'.join([r['templaterole_ref'].split('/')[-1], 'triggering',
+                                                  str(r['optional']), str(r['triggering'])])
+                                        for r in item['complexroles']])
+            lines.append('\t'.join([item['id'], item['name'], item['source'], item['reference'],
+                                    str(item['confidence']), complexrole]))
+        handle.write('\n'.join(lines) + '\n')
+
+    # Convert compartments to source file format and store in file.
+    with open(join(template_folder, 'compartments.tsv'), 'w') as handle:
+        handle.write('\t'.join(['index', 'id', 'name', 'hierarchy', 'pH', 'aliases']) + '\n')
+        data['compartments'].sort(key=itemgetter('id'))
+        lines = list()
+        for index in range(len(data['compartments'])):
+            item = data['compartments'][index]
+            aliases = 'null'
+            if len(item['aliases']) > 0:
+                aliases = ';'.join(item['aliases'])
+            lines.append('\t'.join([item['index'], item['id'], item['name'], str(item['hierarchy']),
+                                    str(item['pH']), aliases]))
+        handle.write('\n'.join(lines) + '\n')
+
+    # Convert reactions to source file format and store in file.
+    with open(join(template_folder, 'reactions.tsv'), 'w') as handle:
+        handle.write('\t'.join(['id', 'compartment', 'direction', 'gfdir', 'type', 'base_cost',
+                                'forward_cost', 'reverse_cost', 'complexes']) + '\n')
+        data['reactions'].sort(key=itemgetter('id'))
+        lines = list()
+        for index in range(len(data['reactions'])):
+            item = data['reactions'][index]
+            compartments = 'c|e'  # No way to recover order of compartments so hard-code the value
+            complexes = 'null'
+            if len(item['templatecomplex_refs']) > 0:
+                complexes = '|'.join([ref.split('/')[-1] for ref in item['templatecomplex_refs']])
+            lines.append('\t'.join([item['id'].split('_')[0], compartments, item['direction'],
+                                    item['GapfillDirection'], item['type'], str(item['base_cost']),
+                                    str(item['forward_penalty']), str(item['reverse_penalty']),
+                                    complexes]))
+        handle.write('\n'.join(lines) + '\n')
+
+    # Convert biomasses to source file format and store in two files.
+    with open(join(template_folder, 'biomasses.tsv'), 'w') as b_handle:
+        with open(join(template_folder, 'biomass_metabolites.tsv'), 'w') as c_handle:
+            b_handle.write('\t'.join(['id', 'name', 'type', 'other', 'dna', 'rna', 'protein', 'lipid',
+                                      'cellwall', 'cofactor', 'energy']) + '\n')
+            c_handle.write('\t'.join(['biomass_id', 'id', 'coefficient', 'coefficient_type', 'class',
+                                      'linked_compounds', 'compartment']) + '\n')
+            data['biomasses'].sort(key=itemgetter('id'))
+            b_lines = list()
+            c_lines = list()
+            for b_index in range(len(data['biomasses'])):
+                item = data['biomasses'][b_index]
+                b_lines.append('\t'.join([item['id'], item['name'], item['type'], str(item['other']),
+                                          str(item['dna']), str(item['rna']), str(item['protein']),
+                                          str(item['lipid']), str(item['cellwall']), str(item['cofactor']),
+                                          str(item['energy'])]))
+                item['templateBiomassComponents'].sort(key=itemgetter('class'))
+                for c_index in range(len(item['templateBiomassComponents'])):
+                    c_item = item['templateBiomassComponents'][c_index]
+                    parts = c_item['templatecompcompound_ref'].split('/')[-1].split('_')
+                    parts[0] += '_0'  # Really should look up compartment ID in parts[1] and use index number
+                    linked = 'null'
+                    if len(c_item['linked_compound_refs']) > 0:
+                        lc = list()
+                        for l_index in range(len(c_item['linked_compound_refs'])):
+                            lc.append(
+                                ':'.join([c_item['linked_compound_refs'][l_index].split('/')[-1].split('_')[0] + '_0',
+                                          str(c_item['link_coefficients'][l_index])]))
+                        linked = '|'.join(lc)
+                    c_lines.append('\t'.join([item['id'], parts[0], str(c_item['coefficient']),
+                                              c_item['coefficient_type'], c_item['class'], linked, parts[1]]))
+            b_handle.write('\n'.join(b_lines) + '\n')
+            c_handle.write('\n'.join(c_lines) + '\n')
+
+    return
 
 
 def _wait_for_job(job_id):
