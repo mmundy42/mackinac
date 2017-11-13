@@ -725,7 +725,7 @@ class LikelihoodAnnotation(object):
 
 
 def download_data_files(fid_role_path, protein_sequence_path, search_db_path, search_program_path,
-                        source_folder_reference='/mmundy/public/modelsupport'):
+                        force=False, source_folder_reference='/mmundy/public/modelsupport'):
     """ Download the data files required to calculate reaction likelihoods.
 
     Calculating reaction likelihoods requires two data files: (1) a target feature
@@ -742,21 +742,25 @@ def download_data_files(fid_role_path, protein_sequence_path, search_db_path, se
         Path to search database file
     search_program_path : str
         Path to search program executable
+    force : bool, optional
+        When True, always download files from workspace
     source_folder_reference : str, optional
         Workspace reference to folder containing data files
     """
 
     # Download the target feature ID to role ID mapping file.
-    data = get_workspace_object_data(join(source_folder_reference, fid_role_file_name), json_data=False)
-    with open(fid_role_path, 'w') as handle:
-        handle.write(data)
+    if force or not exists(fid_role_path):
+        data = get_workspace_object_data(join(source_folder_reference, fid_role_file_name), json_data=False)
+        with open(fid_role_path, 'w') as handle:
+            handle.write(data)
 
     # Download the fasta file of protein sequences.
-    data = get_workspace_object_data(join(source_folder_reference, protein_sequence_file_name), json_data=False)
-    with open(protein_sequence_path, 'w') as handle:
-        handle.write(data)
+    if force or not exists(protein_sequence_path):
+        data = get_workspace_object_data(join(source_folder_reference, protein_sequence_file_name), json_data=False)
+        with open(protein_sequence_path, 'w') as handle:
+            handle.write(data)
 
-    # Build the command based on the configured search program.
+    # Build the command based on the specified search program.
     if 'usearch' in search_program_path.lower():
         args = [search_program_path,
                 '-makeudb_ublast',
