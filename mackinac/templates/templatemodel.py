@@ -3,6 +3,7 @@ import logging
 from collections import defaultdict
 from six import iteritems
 from tempfile import NamedTemporaryFile
+import re
 
 from cobra.core import Object, DictList, Model, Gene
 from cobra.io import save_json_model
@@ -16,7 +17,6 @@ from .templaterole import create_template_role, role_fields
 from .templatecomplex import create_template_complex, complex_fields
 from .templatereaction import create_template_reaction, reaction_fields
 from .feature import create_features_from_patric
-
 
 # Logger for this module
 LOGGER = logging.getLogger(__name__)
@@ -57,6 +57,8 @@ class TemplateModel(Object):
         List of TemplateBiomass objects
     ec_number_index : dict
         Dictionary with EC number as key and list of roles for EC number as value
+    role_name_index : dict
+        Dictionary with search name of role as key and list of TemplateRole objects as value
     _complexes_to_roles : dict
         Dictionary with complex ID as key and list of role IDs as value
     _reactions_to_complexes : dict
@@ -83,7 +85,7 @@ class TemplateModel(Object):
                         reaction_filename, complex_filename, role_filename, universal_metabolites,
                         universal_reactions, verbose=False):
         """ Initialize object from source files.
-        
+
         The source files are tab-delimited files with a header line that defines
         the fields. Each line contains the attributes for initializing an object.
         The format of the source files comes from ModelSEED.
@@ -107,14 +109,16 @@ class TemplateModel(Object):
         universal_reactions : cobra.core.DictList
             List of cobra.core.Reaction objects for universal reactions
         verbose : bool
-            When true
+            When True, show all warning messages
         """
 
-        LOGGER.info('Started initializing from source files')
+        LOGGER.info('Started initializing template model "%s" from source files', self.id)
 
         # Get compartments from the compartment source file.
         self.compartments.extend(read_source_file(compartment_filename, compartment_fields,
                                                   create_template_compartment))
+        LOGGER.info('Added %d compartments from source file "%s"',
+                    len(self.compartments), compartment_filename)
 
         # Get biomasses from the biomass and biomass component source files. Resolve
         # biomass components to universal metabolites and add the metabolites to the
@@ -127,6 +131,8 @@ class TemplateModel(Object):
                                    universal_metabolites)
             self.metabolites.union(biomass.get_metabolites())
             self.biomasses.append(biomass)
+        LOGGER.info('Added %d biomasses from source files "%s" and "%s"',
+                    len(self.biomasses), biomass_filename, component_filename)
 
         # Get complexes from the complex source file. Only complexes that are
         # referenced by reactions are added to the template model.
@@ -190,8 +196,10 @@ class TemplateModel(Object):
             warn('{0} template reactions were not found in universal reactions'.format(skipped))
         if bad_status > 0:
             warn('{0} template reactions reference a universal reaction with bad status'.format(bad_status))
+        LOGGER.info('Added %d reactions from source file "%s"', len(self.reactions), reaction_filename)
         for rxn in self.reactions.query(lambda x: len(x) > 0, 'complex_ids'):
             self.reactions_to_complexes[rxn.id] = rxn.complex_ids
+        LOGGER.info('Added %d complexes from source file "%s"', len(self.complexes), complex_filename)
 
         # Get roles from the role source file. Only roles that are referenced by
         # complexes are added to the template model.
@@ -207,10 +215,11 @@ class TemplateModel(Object):
                 role.complex_ids.add(complx.id)
         for complx in self.complexes.query(lambda x: len(x) > 0, 'roles'):
             self.complexes_to_roles[complx.id] = [role['role_id'] for role in complx.roles]
+        LOGGER.info('Added %d roles from source file "%s"', len(self.roles), role_filename)
 
         # Build an index to lookup roles by EC number.
         self._build_role_ec_index()
-        LOGGER.info('Finished initializing from source files')
+        LOGGER.info('Finished initializing template model "%s" from source files', self.id)
 
         return
 
@@ -240,7 +249,7 @@ class TemplateModel(Object):
 
         # Build an index that maps a search name to one or more TemplateRole objects.
         for role in self.roles:
-            self.role_name_index.append(role.search_name[0])
+            self.role_name_index[role.search_name[0]].append(role)
         return
 
     def reconstruct(self, model_id, genome_features, biomass_id, model_name=None,
@@ -506,18 +515,7 @@ class TemplateModel(Object):
                     output[role.id]['reactions'][reaction.id]['complex_id'] = complx.id
         return output
 
-    def to_source_files(self, folder):
-        """ Make source files from the template model.
-
-        Parameters
-        ----------
-        folder : str
-            Path to folder containing source files
-        """
-
-        return
-
-    def to_cobra_model(self, reversible=False):
+    def to_cobra_model(self, reversible=False, extracellular_id='e'):
         """ Make a COBRA model from the template model.
 
         The returned model includes exchange reactions for all metabolites in the
@@ -527,6 +525,8 @@ class TemplateModel(Object):
         ----------
         reversible : bool, optional
             When True, all reactions in returned model are reversible
+        extracellular_id : str, optional
+            ID of extracellular compartment
 
         Returns
         -------
@@ -540,7 +540,7 @@ class TemplateModel(Object):
         if reversible:
             for rxn in model.reactions:
                 rxn.bounds = (-1000.0, 1000.0)
-        extracellular = model.metabolites.query(lambda x: x == 'e', 'compartment')
+        extracellular = model.metabolites.query(lambda x: x == extracellular_id, 'compartment')
         model.add_reactions([create_boundary(met) for met in extracellular])
         LOGGER.info('Finished making cobra Model object from template %s', self.id)
         return model
@@ -563,9 +563,29 @@ class TemplateModel(Object):
             model = Importer().import_model(cobra_json)
         return model
 
-    def to_list_file(self, file_name):
+    def to_reaction_list_file(self, file_name):
+        """ Make a file with the list of reactions from the template.
+
+        The output file can be used as the universal model for fastgapfill.
+
+        Parameters
+        ----------
+        file_name : str
+            Path to output file with reaction list
+        """
+
+        # All coefficients must be whole numbers.
+        integer_re = re.compile('\.0')
 
         with open(file_name, 'w') as handle:
             for rxn in self.reactions:
                 model_rxn = rxn.create_model_reaction(self.compartments)
-                handle.write('{0}: {1}\n'.format(model_rxn.id, model_rxn.reaction))
+                invalid = False
+                for coefficient in model_rxn.metabolites.values():
+                    if abs(coefficient) < 1.0:
+                        invalid = True
+                if invalid:
+                    LOGGER.warn('Skipped reaction %s with invalid coefficient: %s',
+                                model_rxn.id, model_rxn.reaction)
+                    continue
+                handle.write('{0}: {1}\n'.format(model_rxn.id, re.sub(integer_re, '', model_rxn.reaction)))

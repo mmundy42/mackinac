@@ -147,6 +147,10 @@ class LikelihoodAnnotation(object):
     def statistics(self):
         return self._statistics.copy()
 
+    @property
+    def reaction_values(self):
+        return self._reaction_values.copy()
+
     def calculate(self, genome_id, feature_list, complexes_to_roles, reactions_to_complexes):
         """ Calculate reaction likelihoods from annotated features of a genome.
 
@@ -160,11 +164,6 @@ class LikelihoodAnnotation(object):
             Dictionary with complex ID as key and list of role IDs as value
         reactions_to_complexes : dict
             Dictionary with reaction ID as key and list of complex IDs as value
-
-        Returns
-        -------
-        dict
-            Dictionary keyed by reaction ID of calculated likelihoods and statistics
         """
 
         # If needed, create folder for intermediate files.
@@ -182,7 +181,7 @@ class LikelihoodAnnotation(object):
         if self.debug:
             self._save_data(genome_id)
 
-        return self._reaction_values
+        return
 
     def _calculate_roleset_likelihoods(self, genome_id, feature_list):
         """ Calculate the likelihoods of rolesets from a search for similar proteins.
