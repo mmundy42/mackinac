@@ -2,12 +2,14 @@ import logging
 from warnings import warn
 from os.path import join
 
+from cobra.core import Object, DictList, Model, Gene
 from cobra.flux_analysis.gapfilling import GapFiller
+
 from .likelihood import LikelihoodAnnotation
-from .templates.util import read_json_file
+from .templates.util import read_json_file, create_boundary
 from .templates.universal import create_universal_metabolite, metabolite_json_schema, \
     create_universal_reaction, reaction_json_schema, resolve_universal_reactions
-from .templates.templatemodel import TemplateModel
+from .templates.templatemodel import TemplateModel, TemplateError
 
 # Logger for this module
 LOGGER = logging.getLogger(__name__)
@@ -75,6 +77,41 @@ def create_template_model(universal_folder, template_folder, template_id, name, 
     return template_model
 
 
+def calculate_likelihoods(genome_id, features, template, search_program_path='usearch',
+                          search_db_path='protein.udb', fid_role_path='otu_fid_role.tsv',
+                          work_folder='.'):
+    """ Calculate reaction likelihoods for an organism using annotated features and a template model.
+
+    Parameters
+    ----------
+    genome_id : str
+        ID of genome (just for naming temporary files)
+    features : list
+        List of genome features from organism
+    template : TemplateModel
+        Template model for type of organism
+    search_program_path : str, optional
+        Path to search program executable
+    search_db_path : str, optional
+        Path to search database file
+    fid_role_path : str, optional
+        Path to feature ID to role ID mapping file
+    work_folder : str, optional
+        Path to folder for storing intermediate files
+
+    Returns
+    -------
+    LikelihoodAnnotation
+        Likelihood-based gene annotation for organism
+    """
+
+    LOGGER.info('Started likelihood-based annotation for %s', genome_id)
+    likelihoods = LikelihoodAnnotation(search_program_path, search_db_path, fid_role_path, work_folder)
+    likelihoods.calculate(genome_id, features, template.complexes_to_roles, template.reactions_to_complexes)
+    LOGGER.info('Finished likelihood-based annotation for %s', genome_id)
+    return likelihoods
+
+
 def reconstruct_model_from_features(features, template, model_id, biomass_id, model_name=None, gc_content=0.5):
     """ Reconstruct a model for an organism using annotated features and a template model.
 
@@ -96,7 +133,7 @@ def reconstruct_model_from_features(features, template, model_id, biomass_id, mo
     Returns
     -------
     cobra.core.Model
-        Model reconstructed from organism's genome
+        Model reconstructed from organism's annotated features
     """
 
     # Build a draft model for the organism.
@@ -108,69 +145,78 @@ def reconstruct_model_from_features(features, template, model_id, biomass_id, mo
     return model
 
 
-def calculate_likelihoods(features, model, template, search_program_path='usearch',
-                          search_db_path='protein.udb', fid_role_path='otu_fid_role.tsv',
-                          work_folder=".", cutoff=None):
-    """ Calculate reaction likelihoods for an organism using annotated features and a template model.
+def reconstruct_model_from_likelihoods(likelihoods, template, model_id, biomass_id,
+                                       model_name=None, gc_content=0.5, cutoff=0.1):
+    """ Reconstruct a model for an organism using annotated features and a template model.
 
-    Parameters
-    ----------
-    features : list
-        List of genome features from organism
-    model : cobra.core.Model
-        Model of organism
-    template : TemplateModel
-        Template model for type of organism
-    search_program_path : str, optional
-        Path to search program executable
-    search_db_path : str, optional
-        Path to search database file
-    fid_role_path : str, optional
-        Path to feature ID to role ID mapping file
-    work_folder : str, optional
-        Path to folder for storing intermediate files
+     Parameters
+     ----------
+     features : list
+         List of genome features from organism
+     template : TemplateModel
+         Template model for type of organism
+     model_id : str
+         ID for model
+     biomass_id : str
+         ID of biomass entity in template model used to create biomass objective
+     model_name : str, optional
+         Name for model
+     gc_content : float, optional
+         Percent GC content in genome of organism (value between 0 and 1)
     cutoff : float, optional
         Add reactions with a likelihood value greater than or equal to the
         cutoff (value should be greater than 0 and less than 1).
 
-    Returns
-    -------
-    LikelihoodAnnotation
-        Likelihood-based gene annotation for organism
-    """
+     Returns
+     -------
+     cobra.core.Model
+         Model reconstructed from organism's likelihood-based annotation
+     """
 
-    # Generate likelihood-based gene annotation for the organism.
-    LOGGER.info('Started likelihood-based annotation')
-    likelihoods = LikelihoodAnnotation(search_program_path, search_db_path, fid_role_path, work_folder)
-    likelihoods.calculate(model.id, features, template.complexes_to_roles, template.reactions_to_complexes)
-    LOGGER.info('Finished likelihood-based annotation')
+    # Create a new cobra.core.Model object.
+    model = Model(model_id, name=model_name)
 
-    # Update model with reaction likelihoods. Reaction IDs in returned dictionary
-    # are in template model format.
-    num_set = 0
-    num_added = 0
-    more_reactions = list()
-    num_not_found = 0
+    # Find all of the reactions that have a likelihood value greater than the cutoff.
+    reaction_list = list()
     reaction_likelihoods = likelihoods.reaction_values
     for rxn_id in reaction_likelihoods:
-        template_reaction = template.reactions.get_by_id(rxn_id)
-        try:
-            reaction = model.reactions.get_by_id(template_reaction.model_id)
-            reaction.notes['likelihood'] = reaction_likelihoods[rxn_id]['likelihood']
-            reaction.notes['likelihood_str'] = '{0}'.format(reaction.notes['likelihood'])
-            num_set += 1
-        except KeyError:
-            if cutoff is not None and reaction_likelihoods[rxn_id]['likelihood'] >= cutoff:
-                more_reactions.append(template_reaction.create_model_reaction(template.compartments))
-                num_added += 1
-            else:
-                num_not_found += 1
-    if len(more_reactions) > 0:
-        model.add_reactions(more_reactions)
-    LOGGER.info('Set likelihood for %d reactions, added %d reactions, %d reactions not set',
-                num_set, num_added, num_not_found)
+        if reaction_likelihoods[rxn_id]['likelihood'] >= cutoff:
+            template_reaction = template.reactions.get_by_id(rxn_id)
+            model_reaction = template_reaction.create_model_reaction(template.compartments)
+            model_reaction.notes['likelihood'] = reaction_likelihoods[rxn_id]['likelihood']
+            model_reaction.notes['likelihood_str'] = '{0}'.format(model_reaction.notes['likelihood'])
+            reaction_list.append(model_reaction)
+    if len(reaction_list) == 0:
+        raise ValueError('There are no reactions with a likelihood greater than cutoff of {}'.format(cutoff))
+    model.add_reactions(reaction_list)
 
-    return likelihoods
+    # Add exchange reactions for all metabolites in the extracellular compartment.
+    LOGGER.info('Started adding exchange reactions to model')
+    extracellular = model.metabolites.query(lambda x: x == 'e', 'compartment')
+    exchanges = [create_boundary(met) for met in extracellular]
+    model.add_reactions(exchanges)
+    LOGGER.info('Finished adding %d exchange reactions to model', len(exchanges))
+
+    # Add a magic exchange reaction for the special biomass metabolite which seems to be
+    # required for ModelSEED models and which we know has id "cpd11416_c".
+    # @todo Move this since it is specific to ModelSEED?
+    model.add_reactions([create_boundary(template.metabolites.get_by_id('cpd11416_c'), type='sink')])
+
+    # Create a biomass reaction, add it to the model, and make it the objective.
+    LOGGER.info('Started adding biomass reaction')
+    try:
+        biomass_reaction = template.biomasses.get_by_id(biomass_id).create_objective(gc_content)
+    except KeyError:
+        raise TemplateError('Biomass "{0}" does not exist in template model'.format(biomass_id))
+    model.add_reactions([biomass_reaction])
+    biomass_reaction.objective_coefficient = 1.0
+    LOGGER.info('Finished adding biomass reaction {0} as objective'.format(biomass_reaction.id))
+
+    # Add compartments to the model (this is fixed in a future version of cobra).
+    for compartment in template.compartments:
+        model.compartments[compartment.model_id] = compartment.name
+
+    return model
 
 
 def gapfill_model(model, template, method='default', penalties=None, demand_reactions=True,
