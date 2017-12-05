@@ -1,4 +1,5 @@
 from six import string_types, iteritems
+from operator import attrgetter
 
 from cobra.core import Reaction, Object
 
@@ -76,8 +77,6 @@ class TemplateReaction(Object):
         List of compartment IDs where reaction can occur
     _metabolites : dict
         Metabolites and their stoichiometric coefficients for the reaction
-    model_id : str
-        ID of reaction in an organism model
     """
 
     def __init__(self, id):
@@ -168,6 +167,42 @@ class TemplateReaction(Object):
         self._metabolites = new_metabolites.copy()
 
     @property
+    def reactants(self):
+        """ Return a list of reactants for the reaction. """
+        return [k for k, v in iteritems(self._metabolites) if v < 0]
+
+    @property
+    def products(self):
+        """ Return a list of products for the reaction. """
+        return [k for k, v in iteritems(self._metabolites) if v >= 0]
+
+    @property
+    def reaction_str(self):
+        """ Return a human readable reaction string. """
+
+        def format(number):
+            return str(number).rstrip(".0") + " "
+
+        reactant_bits = []
+        product_bits = []
+        for met in sorted(self._metabolites, key=attrgetter("id")):
+            coefficient = self._metabolites[met]
+            if coefficient >= 0:
+                product_bits.append(format(coefficient) + met.id)
+            else:
+                reactant_bits.append(format(abs(coefficient)) + met.id)
+
+        reaction_string = ' + '.join(reactant_bits)
+        if self.gapfill_direction == '=':
+            reaction_string += ' <=> '
+        elif self.gapfill_direction == '<':
+            reaction_string += ' <-- '
+        elif self.gapfill_direction == '>':
+            reaction_string += ' --> '
+        reaction_string += ' + '.join(product_bits)
+        return reaction_string
+
+    @property
     def model_id(self):
         # Always use the first compartment ID (no idea why ...)
         return '{0}_{1}'.format(self.id, self._compartment_ids[0])
@@ -177,7 +212,7 @@ class TemplateReaction(Object):
         
         Parameters
         ----------
-        compartments : list of TemplateCompartment objects
+        compartments : cobra.core.DictList of TemplateCompartment objects
             Compartments in the organism model
             
         Returns
@@ -196,7 +231,7 @@ class TemplateReaction(Object):
         model_metabolites = dict()
         for metabolite, coefficient in iteritems(self._metabolites):
             model_met = metabolite.copy()
-            model_compartment = compartments.get_by_id(model_met.compartment)  # @todo Need to figure out type here
+            model_compartment = compartments.get_by_id(model_met.compartment)
             if model_compartment.model_id != self._compartment_ids[int(model_compartment.id)]:
                 raise ValueError('Inconsistent order of compartment IDs in template reaction {0}'
                                  .format(self.id))
