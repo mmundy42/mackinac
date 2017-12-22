@@ -16,10 +16,11 @@ LOGGER = logging.getLogger(__name__)
 
 
 def create_template_model(universal_folder, template_folder, template_id, name, type='growth',
-                          domain='Bacteria', verbose=False, validate=False):
+                          domain='Bacteria', exclude=None, verbose=False, validate=False):
     """ Create a template model object from ModelSEED source files.
 
-    The universal folder must contain these files: (1) "metabolites.tsv", (2) "reactions.tsv".
+    The universal folder must contain these files: (1) "metabolites.json", (2) "reactions.json".
+
     The template folder must contain these files: (1) "biomass_metabolites.tsv",
     (2) "biomasses.tsv", (3) "compartments.tsv" , (4) "complexes.tsv", (5) "reactions.tsv",
     (6) "roles.tsv". Each file has required fields that are needed to create a template
@@ -39,10 +40,14 @@ def create_template_model(universal_folder, template_folder, template_id, name, 
         Type of template model (usually "growth")
     domain : str, optional
         Domain of organisms represented by template model
+    exclude : set of str, {"pseudo", "status"}, optional
+        Types of reactions to exclude from template, where "pseudo" means to exclude
+        reactions with no metabolites, "status" means to exclude reactions where
+        reaction status is not OK
     verbose : bool, optional
         When True, show all warning messages
     validate : bool, optional
-        When True, check for common problems
+        When True, check for common problems with universal reactions
 
     Returns
     -------
@@ -71,6 +76,7 @@ def create_template_model(universal_folder, template_folder, template_id, name, 
         join(template_folder, 'roles.tsv'),
         universal_metabolites,
         universal_reactions,
+        exclude,
         verbose
     )
 

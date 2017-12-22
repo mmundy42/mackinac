@@ -1,5 +1,4 @@
 from warnings import warn
-import logging
 from collections import defaultdict
 from six import iteritems
 from tempfile import NamedTemporaryFile
@@ -17,9 +16,7 @@ from .templaterole import create_template_role, role_fields
 from .templatecomplex import create_template_complex, complex_fields
 from .templatereaction import create_template_reaction, reaction_fields
 from .feature import create_features_from_patric
-
-# Logger for this module
-LOGGER = logging.getLogger(__name__)
+from ..logger import LOGGER
 
 
 class TemplateError(Exception):
@@ -83,7 +80,7 @@ class TemplateModel(Object):
 
     def init_from_files(self, compartment_filename, biomass_filename, component_filename,
                         reaction_filename, complex_filename, role_filename, universal_metabolites,
-                        universal_reactions, verbose=False):
+                        universal_reactions, exclude=None, verbose=False):
         """ Initialize object from source files.
 
         The source files are tab-delimited files with a header line that defines
@@ -108,11 +105,17 @@ class TemplateModel(Object):
             List of cobra.core.Metabolite objects for universal metabolites
         universal_reactions : cobra.core.DictList
             List of cobra.core.Reaction objects for universal reactions
+        exclude : set of str, {"pseudo", "status"}, optional
+            Types of reactions to exclude from template, where "pseudo" means to exclude
+            reactions with no metabolites, "status" means to exclude reactions where
+            reaction status is not OK
         verbose : bool
             When True, show all warning messages
         """
 
         LOGGER.info('Started initializing template model "%s" from source files', self.id)
+        if exclude is None:
+            exclude = set()
 
         # Get compartments from the compartment source file.
         self.compartments.extend(read_source_file(compartment_filename, compartment_fields,
@@ -142,6 +145,8 @@ class TemplateModel(Object):
         # corresponding universal reaction.
         skipped = 0
         bad_status = 0
+        obsolete = 0
+        pseudo = 0
         reactions = read_source_file(reaction_filename, reaction_fields, create_template_reaction)
         for rxn in reactions:
             # Get universal reaction for definition, metabolites, and status.
@@ -149,16 +154,24 @@ class TemplateModel(Object):
                 u_rxn = universal_reactions.get_by_id(rxn.id)
                 if u_rxn.notes['is_obsolete']:
                     u_rxn = universal_reactions.get_by_id(u_rxn.notes['replaced_by'])
-                    # Need logging or stats
+                    obsolete += 1
+                    LOGGER.info('Obsolete universal reaction %s replaced by %s', rxn.id, u_rxn.id)
             except KeyError:
                 if verbose:
                     warn('Template reaction {0} was not found in universal reactions'.format(rxn.id))
                 skipped += 1
                 continue
             if 'OK' not in u_rxn.notes['status']:
-                if verbose:
-                    warn('Universal reaction {0} status {1} is not OK'.format(u_rxn.id, u_rxn.notes['status']))
                 bad_status += 1
+                if 'status' in exclude:
+                    LOGGER.info('Skipped universal reaction %s because status %s is not OK',
+                                u_rxn.id, u_rxn.notes['status'])
+                    continue
+                LOGGER.info('Universal reaction %s status %s is not OK', u_rxn.id, u_rxn.notes['status'])
+            if len(u_rxn.metabolites) == 0:
+                if 'pseudo' in exclude:
+                    LOGGER.info('Skipped universal reaction %s because it has no metabolites', u_rxn.id)
+                    pseudo += 1
 
             # Convert a reverse reaction to a forward reaction.
             reverse = 1.0
@@ -192,11 +205,17 @@ class TemplateModel(Object):
                 for complx in complexes:
                     complx.reaction_ids.add(rxn.id)
 
-        if skipped > 0:
-            warn('{0} template reactions were not found in universal reactions'.format(skipped))
-        if bad_status > 0:
-            warn('{0} template reactions reference a universal reaction with bad status'.format(bad_status))
+        if verbose:
+            if skipped > 0:
+                warn('{0} template reactions were not found in universal reactions'.format(skipped))
+            if bad_status > 0:
+                warn('{0} template reactions reference a universal reaction with bad status'.format(bad_status))
+            if obsolete > 0:
+                warn('{0} template reactions reference a universal reaction that is obsolete'.format(obsolete))
+            if pseudo > 0:
+                warn('{0} template reactions reference a universal reaction that has no metabolites'.format(pseudo))
         LOGGER.info('Added %d reactions from source file "%s"', len(self.reactions), reaction_filename)
+        LOGGER.info('Added %d metabolites from reactions', len(self.metabolites))
         for rxn in self.reactions.query(lambda x: len(x) > 0, 'complex_ids'):
             self.reactions_to_complexes[rxn.id] = rxn.complex_ids
         LOGGER.info('Added %d complexes from source file "%s"', len(self.complexes), complex_filename)
@@ -563,29 +582,46 @@ class TemplateModel(Object):
             model = Importer().import_model(cobra_json)
         return model
 
-    def to_reaction_list_file(self, file_name):
+    def to_reaction_list_file(self, list_file_name, dictionary_file_name):
         """ Make a file with the list of reactions from the template.
 
         The output file can be used as the universal model for fastgapfill.
 
         Parameters
         ----------
-        file_name : str
+        list_file_name : str
             Path to output file with reaction list
+        dictionary_file_name : str
+            Path to dictionary file that maps template metabolite IDs to model metabolite IDs
         """
 
         # All coefficients must be whole numbers.
         integer_re = re.compile('\.0')
 
-        with open(file_name, 'w') as handle:
+        metabolite_dict = dict()
+        with open(list_file_name, 'w') as handle:
             for rxn in self.reactions:
-                model_rxn = rxn.create_model_reaction(self.compartments)
                 invalid = False
-                for coefficient in model_rxn.metabolites.values():
+                for coefficient in rxn.metabolites.values():
                     if abs(coefficient) < 1.0:
                         invalid = True
                 if invalid:
                     LOGGER.warn('Skipped reaction %s with invalid coefficient: %s',
-                                model_rxn.id, model_rxn.reaction)
+                                rxn.id, rxn.reaction_str)
                     continue
-                handle.write('{0}: {1}\n'.format(model_rxn.id, re.sub(integer_re, '', model_rxn.reaction)))
+                if len(rxn.reactants) == 0:
+                    LOGGER.warn('Skipped reaction %s with no reactants', rxn.id)
+                    continue
+                if len(rxn.products) == 0:
+                    LOGGER.warn('Skipped reaction %s with no products', rxn.id)
+                    continue
+                for metabolite in rxn.metabolites:
+                    model_compartment = self.compartments.get_by_id(metabolite.compartment)
+                    model_id = '{0}_{1}'.format(metabolite.notes['universal_id'], model_compartment.model_id)
+                    metabolite_dict[model_id] = metabolite.id
+                definition = rxn.reaction_str
+                handle.write('{0}: {1}\n'.format(rxn.id, re.sub(integer_re, '', definition)))
+
+        with open(dictionary_file_name, 'w') as handle:
+            for model_id in metabolite_dict:
+                handle.write('{0}\t{1}\n'.format(model_id, metabolite_dict[model_id]))

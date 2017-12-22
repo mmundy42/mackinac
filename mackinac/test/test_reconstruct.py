@@ -22,7 +22,7 @@ class TestReconstruct:
         )
         assert model.id == b_theta_id
         assert len(model.reactions) == 971
-        assert len(model.metabolites) == 1027
+        assert len(model.metabolites) == 1028
         assert len(model.compartments) == 2
 
     def test_reconstruct_likelihoods(self, universal_folder, bacteria_folder, b_theta_features,
@@ -41,7 +41,7 @@ class TestReconstruct:
             search_db_path=search_db_path,
             fid_role_path=fid_role_path,
             work_folder=work_folder)
-        assert len(likelihoods.reaction_values) == 5651
+        assert len(likelihoods.reaction_values) == 5652
         assert likelihoods.reaction_values['rxn00006']['likelihood'] == 0.0
         assert pytest.approx(likelihoods.reaction_values['rxn14380']['likelihood'], 0.9594912486067599)
         model = mackinac.reconstruct_model_from_likelihoods(
@@ -53,5 +53,5 @@ class TestReconstruct:
         )
         assert model.id == b_theta_id
         assert len(model.reactions) == 1164
-        assert len(model.metabolites) == 1259
+        assert len(model.metabolites) == 1260
         assert len(model.compartments) == 2

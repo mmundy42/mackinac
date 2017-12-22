@@ -1,12 +1,13 @@
 from warnings import warn
 
-from cobra.core import Metabolite, Reaction
+from cobra.core import Metabolite, Reaction, DictList
+from ..logger import LOGGER
 
 # Required fields in source file for creating a universal metabolite.
 universal_metabolite_fields = {
-    'id', 'formula', 'name', 'charge', 'abbreviation', 'source', 'structure',
-    'pka', 'pkb', 'mass', 'deltag', 'deltagerr', 'aliases', 'is_core',
-    'is_cofactor', 'is_obsolete', 'linked_compound'
+    'abbreviation', 'aliases', 'charge', 'deltag', 'deltagerr', 'formula', 'id',
+    'inchikey', 'is_cofactor', 'is_core', 'is_obsolete', 'linked_compound',
+    'mass', 'name', 'pka', 'pkb', 'smiles', 'source'
 }
 
 # Schema for metabolite JSON file.
@@ -15,38 +16,40 @@ metabolite_json_schema = {
     "title": "Universal metabolites",
     "description": "JSON representation of universal metabolites from ModelSEED",
     "type": "object",
-    "properties": {
-        "id": {
-            "type": "object",
-            "properties": {
-                "abbreviation": {"type": "string"},
-                "abstract_compound": {"type": "string"},
-                "aliases": {"type": "string"},
-                "charge": {"type": "string"},
-                "comprised_of": {"type": "string"},
-                "deltag": {"type": "string"},
-                "deltagerr": {"type": "string"},
-                "formula": {"type": "string"},
-                "id": {"type": "string"},
-                "is_cofactor": {"type": "integer"},
-                "is_core": {"type": "integer"},
-                "is_obsolete": {"type": "integer"},
-                "linked_compound": {"type": "string"},
-                "mass": {"type": "string"},
-                "name": {"type": "string"},
-                "pka": {"type": "string"},
-                "pkb": {"type": "string"},
-                "source": {"type": "string"},
-                "structure": {"type": "string"}
-            }
-        }
+    "additionalProperties": {
+        "type": "object",
+        "properties": {
+            "abbreviation": {"type": "string"},
+            "abstract_compound": {"type": "string"},
+            "aliases": {"type": "string"},
+            "charge": {"type": "string"},
+            "comprised_of": {"type": "string"},
+            "deltag": {"type": "string"},
+            "deltagerr": {"type": "string"},
+            "formula": {"type": "string"},
+            "id": {"type": "string"},
+            "inchikey": {"type": "string"},
+            "is_cofactor": {"type": "integer"},
+            "is_core": {"type": "integer"},
+            "is_obsolete": {"type": "integer"},
+            "linked_compound": {"type": "string"},
+            "mass": {"type": "string"},
+            "name": {"type": "string"},
+            "pka": {"type": "string"},
+            "pkb": {"type": "string"},
+            "smiles": {"type": "string"},
+            "source": {"type": "string"},
+        },
+        "required": list(universal_metabolite_fields),
+        "additionalProperties": {"type": "string"}
     }
 }
 
 # Required fields in source file for creating a universal reaction.
 universal_reaction_fields = {
-    'id', 'name', 'abbreviation', 'code', 'stoichiometry', 'direction', 'reversibility', 'status',
-    'deltag', 'deltagerr', 'aliases', 'linked_reaction', 'is_obsolete', 'is_transport'
+    'abbreviation', 'aliases', 'code', 'direction', 'deltag', 'deltagerr', 'id',
+    'is_obsolete', 'is_transport', 'linked_reaction', 'name', 'reversibility',
+    'status', 'stoichiometry'
 }
 
 # Schema for reaction JSON file.
@@ -55,34 +58,33 @@ reaction_json_schema = {
     "title": "Universal metabolites",
     "description": "JSON representation of universal metabolites from ModelSEED",
     "type": "object",
-    "properties": {
-        "id": {
-            "type": "object",
-            "properties": {
-                "abbreviation": {"type": "string"},
-                "abstract_reaction": {"type": "string"},
-                "aliases": {"type": "string"},
-                "code": {"type": "string"},
-                "comprised_of": {"type": "string"},
-                "compound_ids": {"type": "string"},
-                "definition": {"type": "string"},
-                "deltag": {"type": "string"},
-                "deltagerr": {"type": "string"},
-                "direction": {"type": "string"},
-                "ec_numbers": {"type": "string"},
-                "equation": {"type": "string"},
-                "id": {"type": "string"},
-                "is_obsolete": {"type": "integer"},
-                "is_transport": {"type": "integer"},
-                "linked_reaction": {"type": "string"},
-                "name": {"type": "string"},
-                "notes": {"type": "string"},
-                "pathways": {"type": "string"},
-                "reversibility": {"type": "string"},
-                "status": {"type": "string"},
-                "stoichiometry": {"type": "string"}
-            }
-        }
+    "additionalProperties": {
+        "type": "object",
+        "properties": {
+            "abbreviation": {"type": "string"},
+            "abstract_reaction": {"type": "string"},
+            "aliases": {"type": "string"},
+            "code": {"type": "string"},
+            "compound_ids": {"type": "string"},
+            "definition": {"type": "string"},
+            "deltag": {"type": "string"},
+            "deltagerr": {"type": "string"},
+            "direction": {"type": "string"},
+            "ec_numbers": {"type": "string"},
+            "equation": {"type": "string"},
+            "id": {"type": "string"},
+            "is_obsolete": {"type": "integer"},
+            "is_transport": {"type": "integer"},
+            "linked_reaction": {"type": "string"},
+            "name": {"type": "string"},
+            "notes": {"type": "string"},
+            "pathways": {"type": "string"},
+            "reversibility": {"type": "string"},
+            "status": {"type": "string"},
+            "stoichiometry": {"type": "string"}
+        },
+        "required": list(universal_reaction_fields),
+        "additionalProperties": {"type": "string"}
     }
 }
 
@@ -104,22 +106,22 @@ def create_universal_metabolite(attrs):
         Object created from input attributes
     """
 
-    # If metabolite is marked as obsolete, skip it.
-    if int(attrs['is_obsolete']) == 1:
-        return None
-
     # Create a Metabolite object. All metabolites are placed in the default compartment.
-    metabolite = Metabolite(id=attrs['id'] + '_0',
+    metabolite = Metabolite(id=attrs['id'],
                             name=attrs['name'],
                             charge=float(attrs['charge']),
                             compartment=default_compartment_id)
+    metabolite.notes['universal_id'] = attrs['id']
     if attrs['formula'] != 'null':
         metabolite.formula = attrs['formula']
 
     # Add extended information as notes.
+    metabolite.notes['is_obsolete'] = True if int(attrs['is_obsolete']) == 1 else False
+    metabolite.notes['replaced_by'] = None
     metabolite.notes['abbreviation'] = attrs['abbreviation']
     metabolite.notes['source'] = attrs['source']
-    metabolite.notes['structure'] = attrs['structure']
+    metabolite.notes['inchikey'] = attrs['inchikey']
+    metabolite.notes['smiles'] = attrs['smiles']
     if attrs['pka'] != 'null' and attrs['pka'] != '':
         metabolite.notes['pka'] = dict()
         pka_list = attrs['pka'].split(';')
@@ -195,10 +197,6 @@ def create_universal_reaction(attrs):
         Object created from input attributes
     """
 
-    # If reaction has no metabolites, skip it.
-    if attrs['status'] == 'EMPTY':
-        return None
-
     # Create a cobra.core.Reaction object. Note that lower bound, upper bound, and
     # metabolites need to be set later using the data stored in the "stoichiometry"
     # note and the complete list of universal metabolites.
@@ -253,6 +251,79 @@ def create_universal_reaction_from_fields(fields, field_names):
     return create_universal_reaction(reaction_dict)
 
 
+def _parse_stoichiometry(u_rxn, metabolites, resolved_mets):
+    """ Parse reaction stoichiometry and find each specified metabolite in universal metabolites.
+
+    Parameters
+    ----------
+    u_rxn : cobra.core.Reaction
+        Universal reaction object
+    metabolites : cobra.core.DictList
+        List of cobra.core.Metabolite objects for universal metabolites
+    resolved_mets : cobra.core.DictList
+        List of cobra.core.Metabolite objects of universal metabolites with
+        obsolete metabolites removed and placed in a generic compartment
+    """
+
+    # Just return when there are no metabolites.
+    if len(u_rxn.notes['stoichiometry']) == 0:
+        LOGGER.info('Reaction %s does not have any metabolites', u_rxn.id)
+        return
+
+    # Find each metabolite in the universal metabolites, taking into account
+    # obsolete metabolites.
+    reaction_metabolites = dict()
+    definition_list = u_rxn.notes['stoichiometry'].split(';')
+    for definition in definition_list:
+        fields = definition.split(':')
+        met_id = '{0}_{1}'.format(fields[1], fields[2])
+        try:
+            met = resolved_mets.get_by_id(met_id)
+        except KeyError:
+            # Get the universal metabolite.
+            u_met = metabolites.get_by_id(fields[1])
+
+            # If metabolite is obsolete, find the replacement metabolite.
+            if u_met.notes['is_obsolete']:
+                if u_met.notes['replaced_by'] is not None:
+                    u_met = metabolites.get_by_id(u_met.notes['replaced_by'])
+                else:
+                    if u_met.notes['linked_ids']:
+                        replaced_by = None
+                        for linked_id in u_met.notes['linked_ids']:
+                            try:
+                                linked_met = metabolites.get_by_id(linked_id)
+                                if not linked_met.notes['is_obsolete']:
+                                    # There should be only one linked metabolite that is not obsolete.
+                                    replaced_by = linked_met
+                            except KeyError:
+                                raise ValueError('Metabolite {0} is obsolete and linked metabolite {1} not found'
+                                                 .format(u_met.id, linked_id))
+                        if replaced_by is not None:
+                            LOGGER.info('Obsolete metabolite %s replaced by %s', u_met.id, replaced_by.id)
+                            u_met.notes['replaced_by'] = replaced_by.id
+                            u_met = replaced_by
+                        else:
+                            raise ValueError('Metabolite {0} is obsolete and all replacements are obsolete'
+                                             .format(u_met.id))
+                    else:
+                        raise ValueError('Metabolite {0} is obsolete and no replacement is specified'
+                                         .format(u_met.id))
+
+            # Put the metabolite in a generic compartment.
+            met = u_met.copy()
+            met.id = met_id
+            met.compartment = fields[2]
+            resolved_mets.append(met)
+
+        # Add the metabolite to the set of metabolites for the reaction.
+        reaction_metabolites[met] = float(fields[0])
+
+    # Add all of the metabolites to the reaction.
+    u_rxn.add_metabolites(reaction_metabolites)
+    return
+
+
 def resolve_universal_reactions(reactions, metabolites, validate=False, verbose=False):
     """ Resolve metabolites for universal reactions.
 
@@ -274,15 +345,21 @@ def resolve_universal_reactions(reactions, metabolites, validate=False, verbose=
     reactions : cobra.core.DictList
         List of TemplateReaction objects for universal reactions
     metabolites : cobra.core.DictList
-        List of cobra.core.Metabolite objects
+        List of cobra.core.Metabolite objects for universal metabolites
     validate : bool, optional
         When True, check for common problems
     verbose : bool, optional
         When True, show all warning messages
 
+    Returns
+    -------
+    cobra.core.DictList
+        List of resolved cobra.core.Reaction objects for universal reactions
     """
 
     # Parse the reaction stoichiometry to set the metabolites, lower bound, and upper bound.
+    resolved_rxns = DictList()
+    resolved_mets = DictList()
     for rxn in reactions:
         # Set upper and lower bounds based on directionality.
         if rxn.notes['universal_direction'] == '=':
@@ -301,23 +378,9 @@ def resolve_universal_reactions(reactions, metabolites, validate=False, verbose=
             upper_bound = 1000.0
         rxn.bounds = (lower_bound, upper_bound)
 
-        # Parse the "stoichiometry" note to set the metabolites. Add metabolites
-        # that are in compartments other than the default compartment. See description
+        # Parse the "stoichiometry" note to set the metabolites. See description
         # of stoichiometry format above.
-        reaction_metabolites = dict()
-        metabolite_list = rxn.notes['stoichiometry'].split(';')
-        for met in metabolite_list:
-            fields = met.split(':')
-            metabolite_id = '{0}_{1}'.format(fields[1], fields[2])
-            try:
-                model_metabolite = metabolites.get_by_id(metabolite_id)
-            except KeyError:
-                model_metabolite = metabolites.get_by_id(fields[1] + '_0').copy()
-                model_metabolite.id = '{0}_{1}'.format(fields[1], fields[2])
-                model_metabolite.compartment = fields[2]
-                metabolites.append(model_metabolite)
-            reaction_metabolites[model_metabolite] = float(fields[0])
-        rxn.add_metabolites(reaction_metabolites)
+        _parse_stoichiometry(rxn, metabolites, resolved_mets)
 
         # Find the reaction that an obsolete reaction was replaced by.
         if rxn.notes['is_obsolete']:
@@ -329,13 +392,19 @@ def resolve_universal_reactions(reactions, metabolites, validate=False, verbose=
                         if not linked_rxn.notes['is_obsolete']:
                             replaced_by = linked_rxn.id
                     except KeyError:
-                        warn('Reaction {0} is obsolete and linked reaction {1} not found'.format(rxn.id, linked_id))
+                        raise ValueError('Reaction {0} is obsolete and linked reaction {1} not found'
+                                         .format(rxn.id, linked_id))
                 if replaced_by is not None:
                     rxn.notes['replaced_by'] = replaced_by
                 else:
-                    warn('Reaction {0} is obsolete and all replacements are obsolete'.format(rxn.id))
+                    raise ValueError('Reaction {0} is obsolete and all replacements are obsolete'
+                                     .format(rxn.id))
             else:
-                warn('Reaction {0} is obsolete but no replacement is specified'.format(rxn.id))
+                raise ValueError('Reaction {0} is obsolete but no replacement is specified'
+                                 .format(rxn.id))
+
+        # Add the reaction.
+        resolved_rxns.add(rxn)
 
     # If requested, run checks to validate the reactions.
     if validate:
@@ -353,4 +422,4 @@ def resolve_universal_reactions(reactions, metabolites, validate=False, verbose=
         if num_unbalanced > 0:
             warn('Found {0} unbalanced universal reactions'.format(num_unbalanced))
 
-    return
+    return resolved_rxns

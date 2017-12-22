@@ -50,6 +50,7 @@ the interface can change, or the URL can change. Mackinac uses these default URL
 * ModelSEED web service at http://p3c.theseed.org/dev1/services/ProbModelSEED
 * Workspace web service at https://p3.theseed.org/services/Workspace
 * PATRIC web service at https://www.patricbrc.org/api/
+* PATRIC app service at https://p3.theseed.org/services/app_service
 
 Alternate URLs include the following:
 
@@ -61,6 +62,7 @@ You can change the URL used to connect to a web service as shown below:
     >>> mackinac.modelseed.ms_client.url = 'http://p3c.theseed.org/dev1/services/ProbModelSEED'
     >>> mackinac.workspace.ws_client.url = 'https://p3.theseed.org/services/Workspace'
     >>> mackinac.genome.patric_url = 'https://www.patricbrc.org/api/'
+    >>> mackinac.patric.patric_app_url = 'https://p3.theseed.org/services/app_service'
 
 Direct installation in virtual environment
 ------------------------------------------
@@ -184,20 +186,22 @@ Note, there are some limitations on using the KEGG API, most importantly:
 Release Notes
 -------------
 
-Version 0.8.6 (July XX, 2017)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Version 0.9.0 (January XX, 2018)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+* Added support for template models which includes reconstructing a draft model
+  from the genome of an organism and exporting a template model to a cobra model,
+  a PSAMM model, and a list file
+* Added support for calculating reaction likelihoods and reconstruction a draft
+  model from the reaction likelihoods
+* Added support for gap filling a model using cobra gap fill method
+* Added support for creating models using PATRIC app service
+* Updates to work better with current cobra versions
 * Changed documentation to Read the Docs format and configured build with Sphinx
 * Added documentation for configuring and running model reconstruction from a template
 * Fixed get_modelseed_gapfill_solutions() to convert ID type of reactions to match
-  conversion done by create_cobra_model_from_modelseed_model().
-
-Version 0.8.5 (July 20, 2017)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-* Added support for template models and reconstructing a draft model from the PATRIC
-  genome of an organism
-* Updates to work better with latest cobra version
+  conversion done by create_cobra_model_from_modelseed_model()
+* Bug fixes and better logging
 
 Version 0.8.4 (May 18, 2017)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^

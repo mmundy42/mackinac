@@ -525,11 +525,11 @@ def calculate_likelihoods(reference, search_program_path, search_db_path, fid_ro
     # Generate likelihood-based gene annotation for the organism.
     LOGGER.info('Started likelihood-based annotation')
     likelihood = LikelihoodAnnotation(search_program_path, search_db_path, fid_role_path, work_folder)
-    reaction_likelihoods = likelihood.calculate(stats['id'], genome['features'],
-                                                complexes_to_roles, reactions_to_complexes)
+    likelihood.calculate(stats['id'], genome['features'], complexes_to_roles, reactions_to_complexes)
     LOGGER.info('Finished likelihood-based annotation')
 
     # Store reaction likelihoods with the model.
+    reaction_likelihoods = likelihood.reaction_values
     reaction_list = list()
     for reaction_id in sorted(reaction_likelihoods):
         value = reaction_likelihoods[reaction_id]
