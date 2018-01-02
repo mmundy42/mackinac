@@ -1,4 +1,3 @@
-import logging
 from warnings import warn
 from os.path import join
 
@@ -10,9 +9,7 @@ from .templates.util import read_json_file, create_boundary
 from .templates.universal import create_universal_metabolite, metabolite_json_schema, \
     create_universal_reaction, reaction_json_schema, resolve_universal_reactions
 from .templates.templatemodel import TemplateModel, TemplateError
-
-# Logger for this module
-LOGGER = logging.getLogger(__name__)
+from .logger import LOGGER
 
 
 def create_template_model(universal_folder, template_folder, template_id, name, type='growth',

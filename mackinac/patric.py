@@ -1,19 +1,16 @@
 from time import sleep
 from os.path import join
-import logging
 
 from .SeedClient import SeedClient, handle_server_error, ServerError, JobError
 from .modelutil import get_model_statistics, create_cobra_model, calculate_likelihoods
 from .workspace import delete_workspace_object
+from .logger import LOGGER
 
 # PATRIC app service endpoint
 patric_app_url = 'https://p3.theseed.org/services/app_service'
 
 # Client for running functions on PATRIC app service
 patric_client = SeedClient(patric_app_url, 'AppService')
-
-# Logger for this module
-LOGGER = logging.getLogger(__name__)
 
 
 def check_patric_app_service():

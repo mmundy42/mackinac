@@ -1,9 +1,9 @@
 from operator import itemgetter
 import json
 import requests
-import logging
 
 from .SeedClient import SeedClient, ServerError, handle_server_error
+from .logger import LOGGER
 
 """ Several functions return object metadata which is a tuple with the following fields:
 
@@ -38,9 +38,6 @@ workspace_url = 'https://p3.theseed.org/services/Workspace'
 
 # Client for running functions on Workspace web service.
 ws_client = SeedClient(workspace_url, 'Workspace')
-
-# Logger for this module
-LOGGER = logging.getLogger(__name__)
 
 
 def shock_download(url, token):

@@ -4,8 +4,8 @@ from warnings import warn
 from math import log10, isnan
 import subprocess
 from collections import defaultdict
-import logging
 
+from .logger import LOGGER
 from .workspace import get_workspace_object_data
 
 # E values of less than 1E-200 are treated as 1E-200 to avoid log of 0 issues.
@@ -16,9 +16,6 @@ protein_sequence_file_name = 'protein.fasta'
 
 # Name of feature ID to role ID mapping file
 fid_role_file_name = 'otu_fid_role.tsv'
-
-# Logger for this module
-LOGGER = logging.getLogger(__name__)
 
 
 class LikelihoodError(Exception):

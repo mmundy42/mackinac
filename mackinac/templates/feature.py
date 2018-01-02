@@ -1,15 +1,12 @@
 import re
 from collections import defaultdict
-import logging
 
 from cobra.core import Object, DictList
 
 from .util import make_search_name, ec_number_re
 from ..modelutil import patric_gene_prefix_re
+from ..logger import LOGGER
 
-
-# Logger for this module
-LOGGER = logging.getLogger(__name__)
 
 # Regular expression to remove special characters from feature IDs because
 # they cause confusion in cobra.core.DictList objects.

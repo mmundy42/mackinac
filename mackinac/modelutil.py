@@ -1,22 +1,19 @@
 from warnings import warn
 from os.path import join
 import re
-import logging
 
 from cobra import Model, Reaction, Metabolite, Gene, DictList
 
 from .workspace import get_workspace_object_meta, get_workspace_object_data, put_workspace_object
 from .likelihood import LikelihoodAnnotation
 from .SeedClient import ObjectNotFoundError
+from .logger import LOGGER
 
 # Regular expression for compartment suffix on ModelSEED IDs
 modelseed_suffix_re = re.compile(r'_([a-z])\d*$')
 
 # Regular expression for prefix on PATRIC gene IDs
 patric_gene_prefix_re = re.compile(r'^fig\|')
-
-# Logger for this module
-LOGGER = logging.getLogger(__name__)
 
 
 def convert_compartment_id(modelseed_id, format_type):

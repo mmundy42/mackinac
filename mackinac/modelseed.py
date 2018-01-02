@@ -3,7 +3,6 @@ from time import sleep
 from operator import itemgetter
 from warnings import warn
 import re
-import logging
 from os.path import join
 
 from cobra import Model, Reaction, Metabolite
@@ -12,6 +11,7 @@ from .SeedClient import SeedClient, ServerError, ObjectNotFoundError, JobError, 
 from .workspace import get_workspace_object_meta, get_workspace_object_data, put_workspace_object
 from .modelutil import create_cobra_model, convert_compartment_id, convert_suffix, modelseed_suffix_re, \
     calculate_likelihoods, get_model_statistics
+from .logger import LOGGER
 
 # ModelSEED service endpoint
 modelseed_url = 'http://p3c.theseed.org/dev1/services/ProbModelSEED'
@@ -24,9 +24,6 @@ ms_client = SeedClient(modelseed_url, 'ProbModelSEED')
 
 # Name of folder where ModelSEED models are stored
 model_folder = 'modelseed'
-
-# Logger for this module
-LOGGER = logging.getLogger(__name__)
 
 
 def calculate_modelseed_likelihoods(model_id, search_program_path, search_db_path, fid_role_path, work_folder):
