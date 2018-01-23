@@ -192,7 +192,7 @@ Version 0.9.0 (January XX, 2018)
 * Added support for template models which includes reconstructing a draft model
   from the genome of an organism and exporting a template model to a cobra model,
   a PSAMM model, and a list file
-* Added support for calculating reaction likelihoods and reconstruction a draft
+* Added support for calculating reaction likelihoods and reconstructing a draft
   model from the reaction likelihoods
 * Added support for gap filling a model using cobra gap fill method
 * Added support for creating models using PATRIC app service
