@@ -13,11 +13,11 @@ from .modelutil import create_cobra_model, convert_compartment_id, convert_suffi
     calculate_likelihoods, get_model_statistics
 from .logger import LOGGER
 
-# ModelSEED service endpoint
-modelseed_url = 'http://p3c.theseed.org/dev1/services/ProbModelSEED'
+# ModelSEED production service endpoint
+modelseed_url = 'https://p3.theseed.org/services/ProbModelSEED'
 
-# Former ModelSEED production service endpoint
-prod_modelseed_url = 'https://p3.theseed.org/services/ProbModelSEED'
+# ModelSEED development service endpoint
+dev_modelseed_url = 'http://p3c.theseed.org/dev1/services/ProbModelSEED'
 
 # Client for running functions on ModelSEED web service
 ms_client = SeedClient(modelseed_url, 'ProbModelSEED')
