@@ -152,29 +152,29 @@ def reconstruct_model_from_likelihoods(likelihoods, template, model_id, biomass_
                                        model_name=None, gc_content=0.5, cutoff=0.1):
     """ Reconstruct a model for an organism using annotated features and a template model.
 
-     Parameters
-     ----------
-     features : list
-         List of genome features from organism
-     template : TemplateModel
-         Template model for type of organism
-     model_id : str
-         ID for model
-     biomass_id : str
-         ID of biomass entity in template model used to create biomass objective
-     model_name : str, optional
-         Name for model
-     gc_content : float, optional
-         Percent GC content in genome of organism (value between 0 and 1)
+    Parameters
+    ----------
+    features : list
+        List of genome features from organism
+    template : TemplateModel
+        Template model for type of organism
+    model_id : str
+        ID for model
+    biomass_id : str
+        ID of biomass entity in template model used to create biomass objective
+    model_name : str, optional
+        Name for model
+    gc_content : float, optional
+        Percent GC content in genome of organism (value between 0 and 1)
     cutoff : float, optional
         Add reactions with a likelihood value greater than or equal to the
         cutoff (value should be greater than 0 and less than 1).
 
-     Returns
-     -------
-     cobra.core.Model
-         Model reconstructed from organism's likelihood-based annotation
-     """
+    Returns
+    -------
+    cobra.core.Model
+        Model reconstructed from organism's likelihood-based annotation
+    """
 
     # Create a new cobra.core.Model object.
     model = Model(model_id, name=model_name)
