@@ -154,8 +154,8 @@ def reconstruct_model_from_likelihoods(likelihoods, template, model_id, biomass_
 
     Parameters
     ----------
-    features : list
-        List of genome features from organism
+    likelihoods : LikelihoodAnnotation
+        Likelihood-based gene annotation for organism
     template : TemplateModel
         Template model for type of organism
     model_id : str
