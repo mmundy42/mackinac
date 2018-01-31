@@ -437,8 +437,9 @@ def list_modelseed_models(base_folder=None, sort_key='rundate', print_output=Fal
     if not print_output:
         return output
     for model in output:
-        print('Model {0} for organism {1} with {2} reactions and {3} metabolites'
-              .format(model['ref'], model['name'], model['num_reactions'], model['num_compounds']))
+        if model['status'] == 'complete':
+            print('Model {0} for organism {1} with {2} reactions and {3} metabolites'
+                  .format(model['ref'], model['name'], model['num_reactions'], model['num_compounds']))
     return None
 
 
