@@ -1,7 +1,7 @@
 from warnings import warn
 from os.path import join
 
-from cobra.core import Object, DictList, Model, Gene
+from cobra.core import Model
 from cobra.flux_analysis.gapfilling import GapFiller
 
 from .likelihood import LikelihoodAnnotation
