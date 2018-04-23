@@ -12,5 +12,5 @@ from .reconstruct import create_template_model, calculate_likelihoods, reconstru
     reconstruct_model_from_likelihoods, gapfill_model, check_boundary_metabolites
 from .patric import check_patric_app_service, list_patric_apps, create_patric_model, \
     create_cobra_model_from_patric_model, calculate_patric_likelihoods, delete_patric_model, \
-    get_patric_model_stats
+    get_patric_fba_solutions, get_patric_gapfill_solutions, get_patric_model_stats, list_patric_models
 from .SeedClient import get_token

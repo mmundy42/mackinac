@@ -84,7 +84,7 @@ def get_workspace_object_meta(reference):
         LOGGER.info('Finished get object metadata using web service for "%s"', reference)
         return metadata_list[0][0]
     except ServerError as e:
-        handle_server_error(e, [reference])
+        raise handle_server_error(e, [reference])
 
 
 def get_workspace_object_data(reference, json_data=True):
@@ -104,7 +104,6 @@ def get_workspace_object_data(reference, json_data=True):
     """
 
     LOGGER.info('Started get object data using web service for "%s"', reference)
-    data = None
     try:
         # The output from get() is a list of tuples. The first element in the
         # tuple is the metadata which has the url to the Shock node when the
@@ -116,7 +115,7 @@ def get_workspace_object_data(reference, json_data=True):
         else:
             data = object_list[0][1]
     except Exception as e:
-        handle_server_error(e, [reference])
+        raise handle_server_error(e, [reference])
     LOGGER.info('Finished get object data using web service for "%s"', reference)
 
     if json_data:
@@ -124,7 +123,7 @@ def get_workspace_object_data(reference, json_data=True):
     return data
 
 
-def list_workspace_objects(folder, sort_key='folder', recursive=True, print_output=False):
+def list_workspace_objects(folder, sort_key='folder', recursive=True, print_output=False, query=None):
     """ List the objects in the specified workspace folder.
 
     Parameters
@@ -137,6 +136,8 @@ def list_workspace_objects(folder, sort_key='folder', recursive=True, print_outp
         When True, include all subobjects in folder
     print_output : bool, optional
         When True, print formatted output instead of returning the list
+    query : dict
+        Dictionary of query terms (e.g. 'type', 'name', etc.)
 
     Returns
     -------
@@ -145,11 +146,16 @@ def list_workspace_objects(folder, sort_key='folder', recursive=True, print_outp
     """
 
     # Get the list of objects in the specified folder.
+    params = dict()
+    params['paths'] = [folder]
+    params['recursive'] = recursive
+    if query is not None:
+        params['query'] = query
     LOGGER.info('Started list objects using web service for folder "%s"', folder)
     try:
-        output = ws_client.call('ls', {'paths': [folder], 'recursive': recursive})
+        output = ws_client.call('ls', params)
     except ServerError as e:
-        handle_server_error(e, [folder])
+        raise handle_server_error(e, [folder])
     LOGGER.info('Finished list objects using web service for folder "%s"', folder)
 
     # See if the folder is in the returned data.
@@ -191,8 +197,8 @@ def list_workspace_objects(folder, sort_key='folder', recursive=True, print_outp
 def put_workspace_object(reference, object_type, data=None, metadata=None, shock=False, overwrite=False):
     """ Put an object and its metadata in the workspace.
 
-        If the object does not exist the object is created. By default, an existing object
-        is not overwritten and the object data is not stored in Shock.
+    If the object does not exist the object is created. By default, an existing object
+    is not overwritten and the object data is not stored in Shock.
 
     Parameters
     ----------
@@ -223,7 +229,7 @@ def put_workspace_object(reference, object_type, data=None, metadata=None, shock
         params['objects'][0].append(metadata)
     if data is not None and shock is False:
         if metadata is None:
-            params['objects'][0].append(dict())
+            params['objects'][0].append(dict())  # There must be a metadata element in the tuple
         params['objects'][0].append(data)
     if overwrite:
         params['overwrite'] = 1
@@ -235,7 +241,7 @@ def put_workspace_object(reference, object_type, data=None, metadata=None, shock
         LOGGER.info('Finished put object data using web service for "%s"', reference)
         return output[0]
     except ServerError as e:
-        handle_server_error(e, [reference])
+        raise handle_server_error(e, [reference])
 
 
 def delete_workspace_object(reference, force=False):
@@ -265,4 +271,4 @@ def delete_workspace_object(reference, force=False):
         LOGGER.info('Finished delete object using web service for "%s"', reference)
         return output[0]
     except ServerError as e:
-        handle_server_error(e, [reference])
+        raise handle_server_error(e, [reference])

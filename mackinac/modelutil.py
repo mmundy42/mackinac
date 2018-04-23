@@ -1,12 +1,13 @@
 from warnings import warn
 from os.path import join
 import re
+from operator import itemgetter
 
 from cobra import Model, Reaction, Metabolite, Gene, DictList
 
 from .workspace import get_workspace_object_meta, get_workspace_object_data, put_workspace_object
 from .likelihood import LikelihoodAnnotation
-from .SeedClient import ObjectNotFoundError
+from .SeedClient import handle_server_error, ObjectNotFoundError, ServerError, ObjectTypeError
 from .logger import LOGGER
 
 # Regular expression for compartment suffix on ModelSEED IDs
@@ -202,7 +203,8 @@ def _convert_reaction(modelseed_reaction, model, id_type, likelihoods):
                     if not model.genes.has_id(gene_id):
                         gene = Gene(gene_id, subunit['role'])  # Use the role name as the Gene name
                         model.genes.append(gene)
-                    # @todo If a different subunit role is found, should name of gene be updated to include it (with separator)?
+                    # TODO: If a different subunit role is found, should name of gene be updated
+                    #       to include it (with separator)?
                     # else:
                     #     gene = model.genes.get_by_id(gene_id)
                     #     if gene.name != subunit['role']:
@@ -542,7 +544,7 @@ def get_model_statistics(reference):
     Parameters
     ----------
     reference : str
-        Workspace reference to object
+        Workspace reference to model
 
     Returns
     -------
@@ -553,6 +555,27 @@ def get_model_statistics(reference):
     # Build the model statistics dictionary using the object metadata.
     LOGGER.info('Started get model stats using web service for "%s"', reference)
     metadata = get_workspace_object_meta(reference)
+    LOGGER.info('Finished get model stats using web service for "%s"', reference)
+
+    return metadata_to_statistics(metadata)
+
+
+def metadata_to_statistics(metadata):
+    """ Convert metadata for a model object to statistics dictionary.
+
+    Parameters
+    ----------
+    metadata : tuple
+        Workspace object metadata
+
+    Returns
+    -------
+    dict
+        Dictionary of current model statistics
+    """
+
+    if len(metadata) == 0:
+        raise ObjectTypeError('Model metadata not available', None)
     stats = dict()
     stats['fba_count'] = int(metadata[7]['fba_count'])
     stats['gapfilled_reactions'] = int(metadata[7]['gapfilled_reactions'])
@@ -574,6 +597,89 @@ def get_model_statistics(reference):
     stats['template_ref'] = metadata[7]['template_ref']
     stats['type'] = metadata[7]['type']
     stats['unintegrated_gapfills'] = int(metadata[7]['unintegrated_gapfills'])
-    LOGGER.info('Finished get model stats using web service for "%s"', reference)
-
     return stats
+
+
+def convert_fba_solutions(solutions):
+    """ Convert a list of fba solutions to a more usable format.
+
+    Parameters
+    ----------
+    solutions : list of dict
+        List of fba solution summary dictionaries as returned by ModelSEED list_fba_studies method
+
+    Returns
+    -------
+    list
+        List of fba solution data structures
+    """
+
+    # For each solution in the list, get the referenced fba object, and add the
+    # details on the flux values to the solution. Note ModelSEED stores the
+    # results of each flux balance analysis separately.
+    for sol in solutions:
+        try:
+            solution_data = get_workspace_object_data(sol['ref'])
+        except ServerError as e:
+            raise handle_server_error(e, sol['ref'])
+
+        # A ModelSEED model does not have exchange reactions so instead the results of a flux
+        # balance analysis reports flux values on metabolites in the extracellular compartment.
+        # For ModelSEED, a positive flux means the metabolite is consumed and a negative flux
+        # means the metabolite is produced.
+        # @todo Should the fluxes be flipped to match COBRA models?
+        sol['exchanges'] = dict()
+        for flux in solution_data['FBACompoundVariables']:
+            exchange_id = flux['modelcompound_ref'].split('/')[-1]
+            sol['exchanges'][exchange_id] = {
+                'x': flux['value'],
+                'lower_bound': flux['lowerBound'],
+                'upper_bound': flux['upperBound']}
+
+        # Flux values for all of the reactions are reported separately.
+        sol['reactions'] = dict()
+        for flux in solution_data['FBAReactionVariables']:
+            reaction_id = flux['modelreaction_ref'].split('/')[-1]
+            sol['reactions'][reaction_id] = {
+                'x': flux['value'],
+                'lower_bound': flux['lowerBound'],
+                'upper_bound': flux['upperBound']}
+
+    solutions.sort(key=itemgetter('rundate'), reverse=True)  # Sort so last completed fba is first in list
+    return solutions
+
+
+def convert_gapfill_solutions(solutions, id_type='modelseed'):
+    """ Convert a list of gap fill solutions to a more usable format.
+
+    Parameters
+    ----------
+    solutions : list of dict
+        List of gap fill solution dictionaries as returned by ModelSEED list_gapfill_solutions method
+    id_type : {'modelseed', 'bigg'}
+        Type of IDs ('modelseed' for _c or 'bigg' for '[c])
+
+    Returns
+    -------
+    list
+        List of converted gap fill solution dictionaries
+    """
+
+    # Convert the data about the gap filled reactions from a list to a dictionary
+    # keyed by reaction ID.
+    for sol in solutions:
+        if len(sol['solution_reactions']) > 1:
+            warn('Gap fill solution {0} has {1} items in solution_reactions list'
+                 .format(sol['id'], len(sol['solution_reactions'])))
+        sol['reactions'] = dict()
+        if len(sol['solution_reactions']) > 0:  # A gap fill solution can have no reactions
+            for reaction in sol['solution_reactions'][0]:
+                reaction['compartment'] = convert_compartment_id(reaction['compartment'], id_type)
+                reaction_id = '{0}_{1}'.format(re.sub(modelseed_suffix_re, '', reaction['reaction'].split('/')[-1]),
+                                               reaction['compartment'])
+                sol['reactions'][reaction_id] = reaction
+        del sol['solution_reactions']
+
+    # Sort so last completed gap fill is first in list.
+    solutions.sort(key=itemgetter('rundate'), reverse=True)
+    return solutions

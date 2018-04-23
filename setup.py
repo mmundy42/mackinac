@@ -21,7 +21,7 @@ setup(
     setup_requires=[],
     install_requires=requirements,
     tests_require=['pytest', 'numpy'],
-    package_data={'': ['mackinac/data/*']},
+    package_data={'': ['data/modelseed/bacteria/*', 'data/modelseed/original/*', 'data/modelseed/universal/*']},
     author='Michael Mundy, Helena Mendes-Soares, Nicholas Chia',
     author_email='mundy.michael@mayo.edu',
     description='Mackinac: A bridge between ModelSEED and COBRApy',

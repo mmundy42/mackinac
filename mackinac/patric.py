@@ -1,9 +1,11 @@
-from time import sleep
 from os.path import join
+import json
+from time import sleep
 
 from .SeedClient import SeedClient, handle_server_error, ServerError, JobError
-from .modelutil import get_model_statistics, create_cobra_model, calculate_likelihoods
-from .workspace import delete_workspace_object
+from .modelutil import get_model_statistics, create_cobra_model, calculate_likelihoods, \
+    convert_gapfill_solutions, convert_fba_solutions, metadata_to_statistics
+from .workspace import delete_workspace_object, list_workspace_objects
 from .logger import LOGGER
 
 # PATRIC app service endpoint
@@ -11,6 +13,12 @@ patric_app_url = 'https://p3.theseed.org/services/app_service'
 
 # Client for running functions on PATRIC app service
 patric_client = SeedClient(patric_app_url, 'AppService')
+
+# Name of home folder for a PATRIC user
+home_folder = 'home'
+
+# Name of folder where PATRIC models are stored
+model_folder = 'models'
 
 
 def check_patric_app_service():
@@ -72,8 +80,8 @@ def calculate_patric_likelihoods(model_id, search_program_path, search_db_path, 
                                  fid_role_path, work_folder)
 
 
-def create_patric_model(genome_id, model_id, output_folder=None, media_reference=None, template_reference=None):
-    """ Reconstruct and gap fill a PATRIC model for an organism.
+def create_patric_model(genome_id, model_id, media_reference=None, template_reference=None, output_folder=None):
+    """ Reconstruct, gap fill, and optimize a PATRIC model for an organism.
 
     Parameters
     ----------
@@ -81,6 +89,8 @@ def create_patric_model(genome_id, model_id, output_folder=None, media_reference
         Genome ID for organism
     model_id : str
         ID of output model
+    media_reference: str, optional
+        Workspace reference to media to gap fill on (default is complete media)
     template_reference : str, optional
         Workspace reference to template model
     output_folder : str, optional
@@ -99,23 +109,23 @@ def create_patric_model(genome_id, model_id, output_folder=None, media_reference
     params['fulldb'] = 0
     if template_reference is not None:
         params['template_model'] = template_reference
-    folder_reference = _make_patric_folder_reference()
+    if media_reference is not None:
+        params['media'] = media_reference
     if output_folder is None:
-        params['output_path'] = folder_reference
+        params['output_path'] = _make_patric_model_folder_reference()
     else:
         params['output_path'] = output_folder
 
     # Run the server method.
-    LOGGER.info('Started model reconstruction using app service for "%s"', params['genome'])
     try:
         task = patric_client.call('start_app', ['ModelReconstruction', params, params['output_path']])
+        LOGGER.info('Started task %s to run model reconstruction for "%s"', task['id'], params['genome'])
+        _wait_for_patric_task(task['id'])
     except ServerError as e:
         references = None
         if template_reference is not None:
             references = [template_reference]
-        handle_server_error(e, references)
-    LOGGER.info('Started task %s to run model reconstruction for "%s"', task['id'], params['genome'])
-    _wait_for_task(task['id'])
+        raise handle_server_error(e, references)
 
     return get_patric_model_stats(model_id)
 
@@ -153,15 +163,106 @@ def delete_patric_model(model_id):
     # A PATRIC model has both a folder and a model object in the user's model
     # folder so both need to be deleted.
     folder_reference = _make_patric_model_reference(model_id)
-    object_reference = join(_make_patric_folder_reference(), model_id)
+    object_reference = join(_make_patric_model_folder_reference(), model_id)
     LOGGER.info('Started delete model using web service for "%s"', folder_reference)
     try:
         delete_workspace_object(folder_reference, force=True)
         delete_workspace_object(object_reference)
     except ServerError as e:
-        handle_server_error(e, [folder_reference, object_reference])
+        raise handle_server_error(e, [folder_reference, object_reference])
     LOGGER.info('Finished delete model using web service for "%s"', folder_reference)
 
+    return
+
+
+def get_patric_fba_solutions(model_id):
+    """ Get the list of fba solutions available for a PATRIC model.
+
+    Parameters
+    ----------
+    model_id : str
+        ID of model
+
+    Returns
+    -------
+    list
+        List of fba solution data structures
+    """
+
+    # Get the list of fba objects in the model's fba folder.
+    fba_folder = '{0}/fba'.format(_make_patric_model_reference(model_id))
+    LOGGER.info('Started get list of fba solution objects using web service for "%s"', fba_folder)
+    objects = list_workspace_objects(fba_folder, sort_key='name', recursive=False,
+                                     print_output=False, query={'type': ['fba']})
+    LOGGER.info('Finished get list of fba solution objects using web service for "%s", found %d solutions',
+                fba_folder, len(objects))
+
+    # Build a list of fba solutions in same format as returned by ModelSEED list_fba_studies method.
+    solutions = list()
+    for obj in objects:
+        sol = dict()
+        sol['id'] = obj[8]['id']
+        sol['media_ref'] = obj[8]['media']
+        sol['objective'] = obj[8]['objectiveValue']
+        sol['objective_function'] = obj[8]['objective_function']
+        sol['ref'] = join(obj[2], obj[0])
+        sol['rundate'] = obj[3]
+        solutions.append(sol)
+    return convert_fba_solutions(solutions)
+
+
+def get_patric_gapfill_solutions(model_id, id_type='modelseed'):
+    """ Get the list of gap fill solutions for a PATRIC model.
+
+    Parameters
+    ----------
+    model_id : str
+        ID of model
+    id_type : {'modelseed', 'bigg'}
+        Type of IDs ('modelseed' for _c or 'bigg' for '[c])
+
+    Returns
+    -------
+    list
+        List of gap fill solution data structures
+    """
+
+    # Get the list of fba objects in the model's fba folder.
+    gapfill_folder = '{0}/gapfilling'.format(_make_patric_model_reference(model_id))
+    LOGGER.info('Started get list of gapfill solution objects using web service for "%s"', gapfill_folder)
+    objects = list_workspace_objects(gapfill_folder, sort_key='name', recursive=False,
+                                     print_output=False, query={'type': ['fba']})
+    LOGGER.info('Finished get list of gapfill solution objects using web service for "%s", found %d solutions',
+                gapfill_folder, len(objects))
+
+    # Build a list of gapfill solutions in same format as returned by ModelSEED list_gapfill_solutions method.
+    # Note that only the first element in the solutiondata list is used. Never understood how there
+    # could be more than one.
+    solutions = list()
+    for obj in objects:
+        sol = dict()
+        sol['id'] = obj[8]['id']
+        sol['integrated'] = obj[7]['integrated']
+        sol['integrated_solution'] = obj[7]['integrated_solution']
+        sol['media_ref'] = obj[7]['media']
+        sol['ref'] = join(obj[2], obj[0])
+        sol['rundate'] = obj[3]
+        reactions = list()
+        data = json.loads(obj[7]['solutiondata'])
+        for rxn in data[0]:
+            compartment = '{0}{1}'.format(rxn['compartment_ref'].split('/')[-1], rxn['compartmentIndex'])
+            reactions.append({
+                'reaction': rxn['reaction_ref'],
+                'direction': rxn['direction'],
+                'compartment': compartment
+            })
+        sol['solution_reactions'] = list()
+        sol['solution_reactions'].append(reactions)
+        solutions.append(sol)
+    return convert_gapfill_solutions(solutions, id_type)
+
+
+def get_patric_model_data(model_id):
     return
 
 
@@ -182,7 +283,57 @@ def get_patric_model_stats(model_id):
     return get_model_statistics(_make_patric_model_reference(model_id))
 
 
-def _make_patric_folder_reference():
+def list_patric_models(sort_key='date', print_output=False):
+    """ List the PATRIC models for the user.
+
+    Parameters
+    ----------
+    sort_key : {'date', 'id', 'name'}, optional
+        Name of field to use as sort key for output
+    print_output : bool, optional
+        When True, print a summary of the list instead of returning the list
+
+    Returns
+    -------
+    list or None
+        List of model statistics dictionaries or None if printed output
+    """
+
+    # Get the list of model objects in the model folder.
+    objects = list_workspace_objects(_make_patric_model_folder_reference(), sort_key=sort_key, recursive=False,
+                                     print_output=False, query={'type': ['model']})
+
+    # Convert object metadata to model statistics dictionary.
+    output = list()
+    for metadata in objects:
+        output.append(metadata_to_statistics(metadata))
+
+    # Return the list if not printing the output.
+    if not print_output:
+        return output
+
+    # Print a summary of models in the model folder.
+    for model in output:
+        print('Model "{0}" for organism "{1}" with {2} reactions and {3} metabolites'
+              .format(model['id'], model['name'], model['num_reactions'], model['num_compounds']))
+    return None
+
+
+def _make_patric_home_folder_reference():
+    """ Make a workspace reference to user's home folder.
+
+    Returns
+    -------
+    str
+        Reference to user's home folder
+    """
+
+    if patric_client.username is None:
+        patric_client.set_authentication_token()
+    return '/{0}/{1}'.format(patric_client.username, home_folder)
+
+
+def _make_patric_model_folder_reference():
     """ Make a workspace reference to user's PATRIC model folder.
 
     Returns
@@ -191,13 +342,11 @@ def _make_patric_folder_reference():
         Reference to user's model folder
     """
 
-    if patric_client.username is None:
-        patric_client.set_authentication_token()
-    return '/{0}/home/models'.format(patric_client.username)
+    return '{0}/{1}'.format(_make_patric_home_folder_reference(), model_folder)
 
 
 def _make_patric_model_reference(model_id):
-    """ Make a workspace reference to a PATRIC model.
+    """ Make a workspace reference to a specific PATRIC model's folder.
 
     Parameters
     ----------
@@ -210,10 +359,10 @@ def _make_patric_model_reference(model_id):
         Reference to model in user's model folder
     """
 
-    return '{0}/.{1}'.format(_make_patric_folder_reference(), model_id)
+    return '{0}/.{1}'.format(_make_patric_model_folder_reference(), model_id)
 
 
-def _wait_for_task(task_id):
+def _wait_for_patric_task(task_id):
     """ Wait for a task submitted to the PATRIC app service to end.
 
     Parameters
@@ -240,6 +389,7 @@ def _wait_for_task(task_id):
         if task_id in tasks:
             task = tasks[task_id]
             if task['status'] == 'failed':
+                LOGGER.info('Task %s failed', task_id)
                 if 'error' in task:
                     raise ServerError(task['error'])
                 raise ServerError('Task submitted to PATRIC app service failed, no details provided in response')

@@ -188,7 +188,7 @@ def handle_server_error(e, references=None):
     references : list
         List of workspace references in input parameters of server method
 
-    Raises
+    Returns
     -------
     ObjectNotFoundError
         When server method had a problem with a workspace reference
@@ -209,36 +209,36 @@ def handle_server_error(e, references=None):
             reference_string = '"{0}"'.format('" or "'.join(references))
         if 'Object not found!' in e.message or 'Owner not specified in deletion!' in e.message:
             msg = 'An object was not found in workspace: {0}'.format(reference_string)
-            raise ObjectNotFoundError(msg, e.data)
+            return ObjectNotFoundError(msg, e.data)
 
         if 'does not include at least a top level directory!' in e.message:
             msg = 'An object reference is missing a top level directory: {0}'.format(reference_string)
-            raise ObjectNotFoundError(msg, e.data)
+            return ObjectNotFoundError(msg, e.data)
 
         if 'Path does not point to folder or object:' in e.message:
             msg = 'An object was not found in workspace: {0}'.format(reference_string)
-            raise ObjectNotFoundError(msg, e.data)
+            return ObjectNotFoundError(msg, e.data)
 
         if 'User lacks permission to / for requested action!' in e.message:
             msg = 'User does not have permission to a directory in an object reference: {0}'.format(reference_string)
-            raise ObjectNotFoundError(msg, e.data)
+            return ObjectNotFoundError(msg, e.data)
 
         if 'is not a valid object path!' in e.message:
             msg = 'An object reference is not a valid path: {0}'.format(reference_string)
-            raise ObjectNotFoundError(msg, e.data)
+            return ObjectNotFoundError(msg, e.data)
 
         if 'Invalid date format:' in e.message:
             msg = 'An object was not found in workspace: {0}'.format(reference_string)
-            raise ObjectNotFoundError(msg, e.data)
+            return ObjectNotFoundError(msg, e.data)
 
         if 'No gap filling needed on specified condition' in e.message:
-            raise DuplicateGapfillError('Gap fill solution already available for specified media')
+            return DuplicateGapfillError('Gap fill solution already available for specified media')
 
         if 'does not match specified type' in e.message:
-            raise ObjectTypeError(e.message, e.data)
+            return ObjectTypeError(e.message, e.data)
 
-    # Raise the exception again.
-    raise e
+    # Return the input exception.
+    return e
 
 
 class SeedClient(object):

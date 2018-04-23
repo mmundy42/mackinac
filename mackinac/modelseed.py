@@ -2,15 +2,14 @@ from __future__ import absolute_import
 from time import sleep
 from operator import itemgetter
 from warnings import warn
-import re
 from os.path import join
 
 from cobra import Model, Reaction, Metabolite
 
 from .SeedClient import SeedClient, ServerError, ObjectNotFoundError, JobError, handle_server_error
 from .workspace import get_workspace_object_meta, get_workspace_object_data, put_workspace_object
-from .modelutil import create_cobra_model, convert_compartment_id, convert_suffix, modelseed_suffix_re, \
-    calculate_likelihoods, get_model_statistics
+from .modelutil import create_cobra_model, convert_suffix, calculate_likelihoods, get_model_statistics, \
+    convert_gapfill_solutions, convert_fba_solutions
 from .logger import LOGGER
 
 # ModelSEED production service endpoint
@@ -53,7 +52,7 @@ def calculate_modelseed_likelihoods(model_id, search_program_path, search_db_pat
 
     """
 
-    return calculate_likelihoods(_make_modelseed_reference(model_id), search_program_path, search_db_path,
+    return calculate_likelihoods(_make_modelseed_model_reference(model_id), search_program_path, search_db_path,
                                  fid_role_path, work_folder)
 
 
@@ -75,7 +74,7 @@ def create_cobra_model_from_modelseed_model(model_id, id_type='modelseed', valid
         Model object
     """
 
-    return create_cobra_model(_make_modelseed_reference(model_id), id_type=id_type, validate=validate)
+    return create_cobra_model(_make_modelseed_model_reference(model_id), id_type=id_type, validate=validate)
 
 
 def create_universal_model(template_reference, id_type='modelseed'):
@@ -192,18 +191,18 @@ def delete_modelseed_model(model_id):
         ID of model
     """
 
-    reference = _make_modelseed_reference(model_id)
+    reference = _make_modelseed_model_reference(model_id)
     LOGGER.info('Started delete model using web service for "%s"', reference)
     try:
         ms_client.call('delete_model', {'model': reference})
     except ServerError as e:
-        handle_server_error(e, [reference])
+        raise handle_server_error(e, [reference])
     LOGGER.info('Finished delete model using web service for "%s"', reference)
 
     return
 
 
-def gapfill_modelseed_model(model_id, media_reference=None, likelihood=False, comprehensive=False, solver=None):
+def gapfill_modelseed_model(model_id, media_reference=None, likelihood=False, comprehensive=False):
     """ Run gap fill on a ModelSEED model.
 
     The ModelSEED model is updated with the reactions identified by gap fill that
@@ -219,8 +218,6 @@ def gapfill_modelseed_model(model_id, media_reference=None, likelihood=False, co
         True to use likelihood-based gap fill
     comprehensive : bool, optional
         True to run a comprehensive gap fill
-    solver : str, optional
-        Name of LP solver (None to use default solver as configured in web service)
 
     Returns
     -------
@@ -228,22 +225,19 @@ def gapfill_modelseed_model(model_id, media_reference=None, likelihood=False, co
         Dictionary of current model statistics
     """
 
-    reference = _make_modelseed_reference(model_id)
+    reference = _make_modelseed_model_reference(model_id)
     params = dict()
     params['model'] = reference
     params['integrate_solution'] = 1
     if media_reference is not None:
         params['media'] = media_reference
-    if likelihood:
-        params['probanno'] = 1
-    else:
-        params['probanno'] = 0
-    if comprehensive:
-        params['comprehensive_gapfill'] = 1
-    if solver is not None:
-        params['solver'] = solver
+    # if likelihood:
+    #     params['probanno'] = 1
+    # else:
+    #     params['probanno'] = 0
+    # if comprehensive:  # @TODO switch this to alpha?
+    #     params['comprehensive_gapfill'] = 1
 
-    LOGGER.info('Started gapfill model using web service for "%s"', reference)
     try:
         job_id = ms_client.call('GapfillModel', params)
         LOGGER.info('Started job %s to run gapfill model for "%s"', job_id, reference)
@@ -252,7 +246,7 @@ def gapfill_modelseed_model(model_id, media_reference=None, likelihood=False, co
         references = [reference]
         if media_reference is not None:
             references.append(media_reference)
-        handle_server_error(e, references)
+        raise handle_server_error(e, references)
 
     return get_modelseed_model_stats(model_id)
 
@@ -271,51 +265,17 @@ def get_modelseed_fba_solutions(model_id):
         List of fba solution data structures
     """
 
-    reference = _make_modelseed_reference(model_id)
-    LOGGER.info('Started get fba solutions using web service for "%s"', reference)
+    reference = _make_modelseed_model_reference(model_id)
+    LOGGER.info('Started get list of fba solutions using web service for "%s"', reference)
     try:
-        get_modelseed_model_stats(model_id)  # Confirm model exists
+        get_model_statistics(reference)  # Confirm model exists
         solutions = ms_client.call('list_fba_studies', {'model': reference})
     except ServerError as e:
-        handle_server_error(e, [reference])
-        return
-    LOGGER.info('Finished get fba solutions using web service for "%s"', reference)
+        raise handle_server_error(e, [reference])
+    LOGGER.info('Finished get list of fba solutions using web service for "%s", found %d solutions',
+                reference, len(solutions))
 
-    # For each solution in the list, get the referenced fba object, and add the
-    # details on the flux values to the solution. Note ModelSEED stores the
-    # results of each flux balance analysis separately.
-    for sol in solutions:
-        try:
-            solution_data = get_workspace_object_data(sol['ref'])
-        except ServerError as e:
-            handle_server_error(e, sol['ref'])
-
-        # A ModelSEED model does not have exchange reactions so instead the results of a flux
-        # balance analysis reports flux values on metabolites in the extracellular compartment.
-        # For ModelSEED, a positive flux means the metabolite is consumed and a negative flux
-        # means the metabolite is produced.
-        # @todo Should the fluxes be flipped to match COBRA models?
-        sol['exchanges'] = dict()
-        for flux in solution_data['FBACompoundVariables']:
-            exchange_id = flux['modelcompound_ref'].split('/')[-1]
-            sol['exchanges'][exchange_id] = {
-                'x': flux['value'],
-                'lower_bound': flux['lowerBound'],
-                'upper_bound': flux['upperBound']}
-
-        # @todo remove original data?
-
-        # Flux values for all of the reactions are reported separately.
-        sol['reactions'] = dict()
-        for flux in solution_data['FBAReactionVariables']:
-            reaction_id = flux['modelreaction_ref'].split('/')[-1]
-            sol['reactions'][reaction_id] = {
-                'x': flux['value'],
-                'lower_bound': flux['lowerBound'],
-                'upper_bound': flux['upperBound']}
-
-    solutions.sort(key=itemgetter('rundate'), reverse=True)  # Sort so last completed fba is first in list
-    return solutions
+    return convert_fba_solutions(solutions)
 
 
 def get_modelseed_gapfill_solutions(model_id, id_type='modelseed'):
@@ -334,33 +294,17 @@ def get_modelseed_gapfill_solutions(model_id, id_type='modelseed'):
         List of gap fill solution data structures
     """
 
-    reference = _make_modelseed_reference(model_id)
+    reference = _make_modelseed_model_reference(model_id)
     LOGGER.info('Started get gapfill solutions using web service for "%s"', reference)
     try:
-        get_modelseed_model_stats(model_id)  # Confirm model exists
+        get_model_statistics(reference)  # Confirm model exists
         solutions = ms_client.call('list_gapfill_solutions', {'model': reference})
     except ServerError as e:
-        handle_server_error(e, [reference])
-    LOGGER.info('Finished get gapfill solutions using web service for "%s"', reference)
+        raise handle_server_error(e, [reference])
+    LOGGER.info('Finished get gapfill solutions using web service for "%s", found %d solutions',
+                reference, len(solutions))
 
-    # Convert the data about the gap filled reactions from a list to a dictionary
-    # keyed by reaction ID.
-    for sol in solutions:
-        if len(sol['solution_reactions']) > 1:
-            warn('Gap fill solution {0} has {1} items in solution_reactions list'
-                 .format(sol['id'], len(sol['solution_reactions'])))
-        sol['reactions'] = dict()
-        if len(sol['solution_reactions']) > 0:  # A gap fill solution can have no reactions
-            for reaction in sol['solution_reactions'][0]:
-                reaction['compartment'] = convert_compartment_id(reaction['compartment'], id_type)
-                reaction_id = '{0}_{1}'.format(re.sub(modelseed_suffix_re, '', reaction['reaction'].split('/')[-1]),
-                                               reaction['compartment'])
-                sol['reactions'][reaction_id] = reaction
-        del sol['solution_reactions']
-
-    # Sort so last completed gap fill is first in list.
-    solutions.sort(key=itemgetter('rundate'), reverse=True)
-    return solutions
+    return convert_gapfill_solutions(solutions, id_type)
 
 
 def get_modelseed_model_data(model_id):
@@ -377,7 +321,7 @@ def get_modelseed_model_data(model_id):
         Dictionary of all model data
     """
 
-    reference = _make_modelseed_reference(model_id)
+    reference = _make_modelseed_model_reference(model_id)
     LOGGER.info('Started get model data using web service for "%s"', reference)
     try:
         return ms_client.call('get_model', {'model': reference, 'to': 1})
@@ -399,16 +343,14 @@ def get_modelseed_model_stats(model_id):
         Dictionary of current model statistics
     """
 
-    return get_model_statistics(_make_modelseed_reference(model_id))
+    return get_model_statistics(_make_modelseed_model_reference(model_id))
 
 
-def list_modelseed_models(base_folder=None, sort_key='rundate', print_output=False):
+def list_modelseed_models(sort_key='rundate', print_output=False):
     """ List the ModelSEED models for the user.
 
     Parameters
     ----------
-    base_folder : str
-        Workspace reference to folder to search for models
     sort_key : {'rundate', 'id', 'name'}, optional
         Name of field to use as sort key for output
     print_output : bool, optional
@@ -420,15 +362,11 @@ def list_modelseed_models(base_folder=None, sort_key='rundate', print_output=Fal
         List of model statistics dictionaries or None if printed output
     """
 
-    params = dict()
-    if base_folder is not None:
-        params['path'] = base_folder
-
     LOGGER.info('Started list models using web service')
     try:
-        output = ms_client.call('list_models', params)
+        output = ms_client.call('list_models', {})
     except ServerError as e:
-        handle_server_error(e)
+        raise handle_server_error(e)
     LOGGER.info('Finished list models using web service')
     reverse = False
     if sort_key == 'rundate':
@@ -464,7 +402,7 @@ def optimize_modelseed_model(model_id, media_reference=None):
     fba_count = len(get_modelseed_fba_solutions(model_id))
 
     # Set input parameters for method.
-    reference = _make_modelseed_reference(model_id)
+    reference = _make_modelseed_model_reference(model_id)
     params = dict()
     params['model'] = reference
     params['predict_essentiality'] = 1
@@ -472,7 +410,6 @@ def optimize_modelseed_model(model_id, media_reference=None):
         params['media'] = media_reference
 
     # Run the server method.
-    LOGGER.info('Started flux balance analysis using web service for "%s"', reference)
     try:
         job_id = ms_client.call('FluxBalanceAnalysis', params)
         LOGGER.info('Started job %s to run flux balance analysis for "%s"', job_id, reference)
@@ -481,7 +418,7 @@ def optimize_modelseed_model(model_id, media_reference=None):
         references = [reference]
         if media_reference is not None:
             references.append(media_reference)
-        handle_server_error(e, references)
+        raise handle_server_error(e, references)
 
     # The completed job does not have the reference to the fba object that
     # was just created so get the list of solutions. Last completed
@@ -493,21 +430,17 @@ def optimize_modelseed_model(model_id, media_reference=None):
     return float(solutions[0]['objective'])
 
 
-def reconstruct_modelseed_model(genome_id, source='patric', template_reference=None, likelihood=False, model_id=None):
+def reconstruct_modelseed_model(genome_id, model_id=None, template_reference=None):
     """ Reconstruct a draft ModelSEED model for an organism.
 
     Parameters
     ----------
     genome_id : str
         Genome ID or workspace reference to genome
-    source : {'patric', 'rast', 'workspace'}, optional
-        Source of genome
+    model_id : str, optional
+        ID of output model (default is "M" + genome ID)
     template_reference : str, optional
         Workspace reference to template model
-    likelihood : bool, optional
-        True to generate reaction likelihoods
-    model_id : str, optional
-        ID of output model (default is genome ID)
 
     Returns
     -------
@@ -517,23 +450,13 @@ def reconstruct_modelseed_model(genome_id, source='patric', template_reference=N
 
     # Set input parameters for method.
     params = dict()
-    if source == 'patric':
-        params['genome'] = 'PATRIC:' + genome_id
-    elif source == 'rast':
-        params['genome'] = 'RAST:' + genome_id
-    elif source == 'workspace':
-        params['genome'] = genome_id
-    else:
-        raise ValueError('Source type {0} is not supported'.format(source))
+    params['genome'] = 'PATRICSOLR:' + genome_id
+    # params['fulldb'] = 0
     if model_id is None:
-        model_id = genome_id
+        model_id = 'M' + genome_id
     params['output_file'] = model_id
     if template_reference is not None:
         params['template_model'] = template_reference
-    if likelihood:
-        params['probanno'] = 1
-    else:
-        params['probanno'] = 0
     params['gapfill'] = 0
     params['predict_essentiality'] = 0
 
@@ -550,18 +473,15 @@ def reconstruct_modelseed_model(genome_id, source='patric', template_reference=N
         LOGGER.info('Created modelseed folder in workspace for "%s"', ms_client.username)
 
     # Run the server method.
-    LOGGER.info('Started model reconstruction using web service for "%s"', params['genome'])
     try:
         job_id = ms_client.call('ModelReconstruction', params)
+        LOGGER.info('Started job %s to run model reconstruction for "%s"', job_id, params['genome'])
+        _wait_for_job(job_id)
     except ServerError as e:
         references = None
         if template_reference is not None:
             references = [template_reference]
-        handle_server_error(e, references)
-    LOGGER.info('Started job %s to run model reconstruction for "%s"', job_id, params['genome'])
-
-    # The task structure has the workspace where the model is stored but not the name of the model.
-    _wait_for_job(job_id)
+        raise handle_server_error(e, references)
 
     # Get the model statistics for the model.
     stats = get_modelseed_model_stats(model_id)
@@ -685,12 +605,26 @@ def save_modelseed_template_model(template_reference, template_folder):
     return
 
 
-def _make_modelseed_reference(name):
-    """ Make a workspace reference to an object.
+def _make_modelseed_model_folder_reference():
+    """ Make a workspace reference to user's ModelSEED model folder.
+
+    Returns
+    -------
+    str
+        Reference to user's model folder
+    """
+
+    if ms_client.username is None:
+        ms_client.set_authentication_token()
+    return '/{0}/{1}'.format(ms_client.username, model_folder)
+
+
+def _make_modelseed_model_reference(model_id):
+    """ Make a workspace reference to a model object.
 
     Parameters
     ----------
-    name : str
+    model_id : str
         Name of object
 
     Returns
@@ -699,9 +633,7 @@ def _make_modelseed_reference(name):
         Reference to object in user's model folder
     """
 
-    if ms_client.username is None:
-        ms_client.set_authentication_token()
-    return '/{0}/{1}/{2}'.format(ms_client.username, model_folder, name)
+    return '{0}/{1}'.format(_make_modelseed_model_folder_reference(), model_id)
 
 
 def _wait_for_job(job_id):
