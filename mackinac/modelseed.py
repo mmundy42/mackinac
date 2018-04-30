@@ -10,6 +10,7 @@ from .SeedClient import SeedClient, ServerError, ObjectNotFoundError, JobError, 
 from .workspace import get_workspace_object_meta, get_workspace_object_data, put_workspace_object
 from .modelutil import create_cobra_model, convert_suffix, calculate_likelihoods, get_model_statistics, \
     convert_gapfill_solutions, convert_fba_solutions
+from .genome import get_genome_summary
 from .logger import LOGGER
 
 # ModelSEED production service endpoint
@@ -230,6 +231,7 @@ def gapfill_modelseed_model(model_id, media_reference=None, likelihood=False, co
     params['model'] = reference
     params['integrate_solution'] = 1
     if media_reference is not None:
+        get_workspace_object_meta(media_reference)  # Confirm media object exists
         params['media'] = media_reference
     # if likelihood:
     #     params['probanno'] = 1
@@ -239,6 +241,7 @@ def gapfill_modelseed_model(model_id, media_reference=None, likelihood=False, co
     #     params['comprehensive_gapfill'] = 1
 
     try:
+        get_model_statistics(reference)  # Confirm model exists
         job_id = ms_client.call('GapfillModel', params)
         LOGGER.info('Started job %s to run gapfill model for "%s"', job_id, reference)
         _wait_for_job(job_id)
@@ -326,7 +329,7 @@ def get_modelseed_model_data(model_id):
     try:
         return ms_client.call('get_model', {'model': reference, 'to': 1})
     except ServerError as e:
-        handle_server_error(e, [reference])
+        raise handle_server_error(e, [reference])
 
 
 def get_modelseed_model_stats(model_id):
@@ -399,6 +402,7 @@ def optimize_modelseed_model(model_id, media_reference=None):
 
     # Get the current list of fba solutions which is the only way to tell if this
     # optimization is successful because fba_count is not updated in the metadata.
+    # And it confirms that the model exists.
     fba_count = len(get_modelseed_fba_solutions(model_id))
 
     # Set input parameters for method.
@@ -407,6 +411,7 @@ def optimize_modelseed_model(model_id, media_reference=None):
     params['model'] = reference
     params['predict_essentiality'] = 1
     if media_reference is not None:
+        get_workspace_object_meta(media_reference)  # Confirm media object exists
         params['media'] = media_reference
 
     # Run the server method.
@@ -447,6 +452,9 @@ def reconstruct_modelseed_model(genome_id, model_id=None, template_reference=Non
     dict
         Dictionary of current model statistics
     """
+
+    # Confirm genome ID is available in PATRIC.
+    get_genome_summary(genome_id)
 
     # Set input parameters for method.
     params = dict()

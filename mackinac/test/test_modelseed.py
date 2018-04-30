@@ -1,9 +1,9 @@
 import pytest
 
 import mackinac
+from mackinac.SeedClient import ObjectNotFoundError
 
 
-# @pytest.mark.skip(reason='ModelSEED server is currently broken')
 @pytest.mark.usefixtures('authenticate')
 class TestModelseedBacteroidesThetaiotaomicron:
 
@@ -15,7 +15,7 @@ class TestModelseedBacteroidesThetaiotaomicron:
         assert stats['id'] == b_theta_id
         assert stats['name'] == b_theta_name
         assert stats['num_compartments'] == 2
-        assert stats['num_genes'] == 727
+        assert stats['num_genes'] == 718  # Value can change if genome annotation changes
         assert stats['num_biomass_compounds'] == 85
         assert stats['source'] == 'ModelSEED'
 
@@ -30,19 +30,20 @@ class TestModelseedBacteroidesThetaiotaomicron:
 
     def test_optimize(self, b_theta_id):
         objective = mackinac.optimize_modelseed_model(b_theta_id)
-        assert objective == pytest.approx(115.026)  # Value can change if server changes
+        assert objective == pytest.approx(111.633)  # Value can change if genome annotation changes
 
     def test_get_model_stats(self, b_theta_id, b_theta_name):
         stats = mackinac.get_modelseed_model_stats(b_theta_id)
         assert stats['id'] == b_theta_id
         assert stats['name'] == b_theta_name
         assert stats['num_compartments'] == 2
-        assert stats['num_genes'] == 727
+        assert stats['num_genes'] == 718  # Value can change if genome annotation changes
         assert stats['integrated_gapfills'] == 1
         assert stats['unintegrated_gapfills'] == 0
         assert stats['gapfilled_reactions'] == 0   # Value can change if server changes
-        assert stats['ref'] == '/{0}/modelseed/{1}'.format(mackinac.modelseed.ms_client.username, b_theta_id)
-        assert stats['genome_ref'] == '/{0}/modelseed/{1}/genome'.format(mackinac.modelseed.ms_client.username, b_theta_id)
+        model_reference = '/{0}/modelseed/{1}'.format(mackinac.modelseed.ms_client.username, b_theta_id)
+        assert stats['ref'] == model_reference
+        assert stats['genome_ref'] == '{0}/genome'.format(model_reference)
 
     def test_get_model_data(self, b_theta_id):
         data = mackinac.get_modelseed_model_data(b_theta_id)
@@ -56,14 +57,14 @@ class TestModelseedBacteroidesThetaiotaomicron:
     def test_get_gapfill_solutions(self, b_theta_id):
         solutions = mackinac.get_modelseed_gapfill_solutions(b_theta_id)
         assert len(solutions) == 1
-        assert len(solutions[0]['reactions']) > 50
+        assert len(solutions[0]['reactions']) > 50  # Value can change if genome annotation changes
         assert solutions[0]['id'] == 'gf.0'
 
     def test_get_fba_solutions(self, b_theta_id):
         solutions = mackinac.get_modelseed_fba_solutions(b_theta_id)
         assert len(solutions) == 1
-        assert len(solutions[0]['reactions']) > 1000
-        assert len(solutions[0]['exchanges']) > 50
+        assert len(solutions[0]['reactions']) > 1000  # Value can change if genome annotation changes
+        assert len(solutions[0]['exchanges']) > 50  # Value can change if genome annotation changes
         assert solutions[0]['id'] == 'fba.0'
         assert solutions[0]['objective_function'] == 'Max bio1'
 
@@ -76,17 +77,70 @@ class TestModelseedBacteroidesThetaiotaomicron:
                 found = True
             assert output[0]['name'] == b_theta_name
             assert output[0]['ref'] == '/{0}/modelseed/{1}'.format(mackinac.modelseed.ms_client.username, b_theta_id)
-        assert found == True
+        assert found is True
 
     def test_create_cobra_model(self, b_theta_id, b_theta_name):
         model = mackinac.create_cobra_model_from_modelseed_model(b_theta_id)
         assert model.id == b_theta_id
         assert model.name == b_theta_name
-        assert len(model.reactions) > 1000
-        assert len(model.metabolites) > 1000
+        assert len(model.reactions) > 1000  # Value can change if genome annotation changes
+        assert len(model.metabolites) > 1000  # Value can change if genome annotation changes
         assert len(model.compartments) == 2
         solution = model.optimize()
-        assert solution.f > 170.
+        assert solution.f > 170.  # Value can change if genome annotation changes
+
+    def test_not_found_media(self, b_theta_id):
+        bad_media = '/chenry/public/modelsupport/media/BadMedia'
+
+        with pytest.raises(ObjectNotFoundError):
+            mackinac.optimize_modelseed_model(b_theta_id, media_reference=bad_media)
+
+        with pytest.raises(ObjectNotFoundError):
+            mackinac.gapfill_modelseed_model(b_theta_id, media_reference=bad_media)
 
     def test_delete_model(self, b_theta_id):
         mackinac.delete_modelseed_model(b_theta_id)
+
+    def test_not_found_model(self):
+        bad_id = 'BadModel'
+
+        with pytest.raises(ObjectNotFoundError):
+            mackinac.create_cobra_model_from_modelseed_model(bad_id)
+
+        with pytest.raises(ObjectNotFoundError):
+            mackinac.delete_modelseed_model(bad_id)
+
+        with pytest.raises(ObjectNotFoundError):
+            mackinac.gapfill_modelseed_model(bad_id)
+
+        with pytest.raises(ObjectNotFoundError):
+            mackinac.get_modelseed_fba_solutions(bad_id)
+
+        with pytest.raises(ObjectNotFoundError):
+            mackinac.get_modelseed_gapfill_solutions(bad_id)
+
+        with pytest.raises(ObjectNotFoundError):
+            mackinac.get_modelseed_model_data(bad_id)
+
+        with pytest.raises(ObjectNotFoundError):
+            mackinac.get_modelseed_model_stats(bad_id)
+
+        with pytest.raises(ObjectNotFoundError):
+            mackinac.optimize_modelseed_model(bad_id)
+
+    def test_bad_genome_id(self):
+        with pytest.raises(ValueError):
+            mackinac.reconstruct_modelseed_model('900.900')
+
+    def test_bad_sort_key(self):
+        with pytest.raises(KeyError):
+            mackinac.list_modelseed_models(sort_key='banana')
+
+    def test_not_found_template_model(self):
+        bad_template_model = '/chenry/public/modelsupport/templates/BadTemplate'
+
+        with pytest.raises(ObjectNotFoundError):
+            mackinac.create_universal_model(bad_template_model)
+
+        with pytest.raises(ObjectNotFoundError):
+            mackinac.save_modelseed_template_model(bad_template_model, '.')
