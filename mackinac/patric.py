@@ -5,7 +5,9 @@ from time import sleep
 from .SeedClient import SeedClient, handle_server_error, ServerError, JobError
 from .modelutil import get_model_statistics, create_cobra_model, calculate_likelihoods, \
     convert_gapfill_solutions, convert_fba_solutions, metadata_to_statistics
-from .workspace import delete_workspace_object, list_workspace_objects
+from .workspace import delete_workspace_object, list_workspace_objects, get_workspace_object_meta, \
+    get_workspace_object_data
+from .genome import get_genome_summary
 from .logger import LOGGER
 
 # PATRIC app service endpoint
@@ -102,14 +104,19 @@ def create_patric_model(genome_id, model_id, media_reference=None, template_refe
         Dictionary of current model statistics
     """
 
+    # Confirm genome ID is available in PATRIC.
+    get_genome_summary(genome_id)
+
     # Set input parameters for method.
     params = dict()
     params['genome'] = 'PATRICSOLR:' + genome_id
     params['output_file'] = model_id
     params['fulldb'] = 0
     if template_reference is not None:
+        get_workspace_object_meta(template_reference)  # Confirm template object exists
         params['template_model'] = template_reference
     if media_reference is not None:
+        get_workspace_object_meta(media_reference)  # Confirm media object exists
         params['media'] = media_reference
     if output_folder is None:
         params['output_path'] = _make_patric_model_folder_reference()
@@ -190,23 +197,27 @@ def get_patric_fba_solutions(model_id):
     """
 
     # Get the list of fba objects in the model's fba folder.
-    fba_folder = '{0}/fba'.format(_make_patric_model_reference(model_id))
-    LOGGER.info('Started get list of fba solution objects using web service for "%s"', fba_folder)
-    objects = list_workspace_objects(fba_folder, sort_key='name', recursive=False,
+    reference = _make_patric_model_reference(model_id)
+    LOGGER.info('Started get list of fba solution objects using web service for "%s"', reference)
+    get_model_statistics(reference)  # Confirm model exists
+    objects = list_workspace_objects(join(reference, 'fba'), sort_key='name', recursive=False,
                                      print_output=False, query={'type': ['fba']})
     LOGGER.info('Finished get list of fba solution objects using web service for "%s", found %d solutions',
-                fba_folder, len(objects))
+                reference, len(objects))
 
     # Build a list of fba solutions in same format as returned by ModelSEED list_fba_studies method.
     solutions = list()
     for obj in objects:
+        # For some reason, metadata for a fba object is not set in the output
+        # returned by list_workspace_objects().
+        meta = get_workspace_object_meta(join(obj[2], obj[0]))
         sol = dict()
-        sol['id'] = obj[8]['id']
-        sol['media_ref'] = obj[8]['media']
-        sol['objective'] = obj[8]['objectiveValue']
-        sol['objective_function'] = obj[8]['objective_function']
-        sol['ref'] = join(obj[2], obj[0])
-        sol['rundate'] = obj[3]
+        sol['id'] = meta[0]
+        sol['media_ref'] = meta[7]['media']
+        sol['objective'] = meta[8]['objectiveValue']
+        sol['objective_function'] = meta[8]['objective_function']
+        sol['ref'] = join(meta[2], meta[0])
+        sol['rundate'] = meta[3]
         solutions.append(sol)
     return convert_fba_solutions(solutions)
 
@@ -228,12 +239,13 @@ def get_patric_gapfill_solutions(model_id, id_type='modelseed'):
     """
 
     # Get the list of fba objects in the model's fba folder.
-    gapfill_folder = '{0}/gapfilling'.format(_make_patric_model_reference(model_id))
-    LOGGER.info('Started get list of gapfill solution objects using web service for "%s"', gapfill_folder)
-    objects = list_workspace_objects(gapfill_folder, sort_key='name', recursive=False,
+    reference = _make_patric_model_reference(model_id)
+    LOGGER.info('Started get list of gapfill solution objects using web service for "%s"', reference)
+    get_model_statistics(reference)  # Confirm model exists
+    objects = list_workspace_objects(join(reference, 'gapfilling'), sort_key='name', recursive=False,
                                      print_output=False, query={'type': ['fba']})
     LOGGER.info('Finished get list of gapfill solution objects using web service for "%s", found %d solutions',
-                gapfill_folder, len(objects))
+                reference, len(objects))
 
     # Build a list of gapfill solutions in same format as returned by ModelSEED list_gapfill_solutions method.
     # Note that only the first element in the solutiondata list is used. Never understood how there
@@ -241,7 +253,7 @@ def get_patric_gapfill_solutions(model_id, id_type='modelseed'):
     solutions = list()
     for obj in objects:
         sol = dict()
-        sol['id'] = obj[8]['id']
+        sol['id'] = obj[0]
         sol['integrated'] = obj[7]['integrated']
         sol['integrated_solution'] = obj[7]['integrated_solution']
         sol['media_ref'] = obj[7]['media']
@@ -263,7 +275,25 @@ def get_patric_gapfill_solutions(model_id, id_type='modelseed'):
 
 
 def get_patric_model_data(model_id):
-    return
+    """ Get the model data for a PATRIC model.
+
+    Parameters
+    ----------
+    model_id : str
+        ID of model
+
+    Returns
+    -------
+    dict
+        Dictionary of all model data
+    """
+
+    reference = join(_make_patric_model_reference(model_id), 'model')
+    LOGGER.info('Started get model data using web service for "%s"', reference)
+    try:
+        return get_workspace_object_data(reference)
+    except ServerError as e:
+        raise handle_server_error(e, [reference])
 
 
 def get_patric_model_stats(model_id):
@@ -302,6 +332,10 @@ def list_patric_models(sort_key='date', print_output=False):
     # Get the list of model objects in the model folder.
     objects = list_workspace_objects(_make_patric_model_folder_reference(), sort_key=sort_key, recursive=False,
                                      print_output=False, query={'type': ['model']})
+    if objects is None:
+        if print_output:
+            print('There are no models available.')
+        return None
 
     # Convert object metadata to model statistics dictionary.
     output = list()

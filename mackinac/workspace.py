@@ -176,7 +176,7 @@ def list_workspace_objects(folder, sort_key='folder', recursive=True, print_outp
     elif sort_key == 'type':
         key = 1
     else:
-        raise ValueError('Sort key {0} is not supported'.format(sort_key))
+        raise KeyError('Sort key {0} is not supported'.format(sort_key))
     output[folder].sort(key=itemgetter(key), reverse=reverse)
 
     # Print details on the objects.

@@ -75,8 +75,8 @@ class TestModelseedBacteroidesThetaiotaomicron:
         for meta in output:
             if meta['id'] == b_theta_id:
                 found = True
-            assert output[0]['name'] == b_theta_name
-            assert output[0]['ref'] == '/{0}/modelseed/{1}'.format(mackinac.modelseed.ms_client.username, b_theta_id)
+                assert meta['name'] == b_theta_name
+                assert meta['ref'] == '/{0}/modelseed/{1}'.format(mackinac.modelseed.ms_client.username, b_theta_id)
         assert found is True
 
     def test_create_cobra_model(self, b_theta_id, b_theta_name):

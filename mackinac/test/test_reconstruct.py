@@ -21,8 +21,8 @@ class TestReconstruct:
             gc_content=b_theta_summary['gc_content'] / 100.0
         )
         assert model.id == b_theta_id
-        assert len(model.reactions) == 971
-        assert len(model.metabolites) == 1028
+        assert len(model.reactions) == 923  # Value can change if genome annotation changes
+        assert len(model.metabolites) == 999  # Value can change if genome annotation changes
         assert len(model.compartments) == 2
 
     def test_reconstruct_likelihoods(self, universal_folder, bacteria_folder, b_theta_features,
@@ -52,6 +52,6 @@ class TestReconstruct:
             gc_content=b_theta_summary['gc_content'] / 100.0
         )
         assert model.id == b_theta_id
-        assert len(model.reactions) == 1164
-        assert len(model.metabolites) == 1260
+        assert len(model.reactions) == 1164  # Value can change if genome annotation changes
+        assert len(model.metabolites) == 1260  # Value can change if genome annotation changes
         assert len(model.compartments) == 2
