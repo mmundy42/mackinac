@@ -60,7 +60,7 @@ class TestWorkspace:
         assert output is None
 
     def test_list_objects_bad_sort_key(self, test_model):
-        with pytest.raises(ValueError):
+        with pytest.raises(KeyError):
             mackinac.list_workspace_objects(test_model['ref'], sort_key='foobar')
 
     def test_get_object_meta(self, test_model):
