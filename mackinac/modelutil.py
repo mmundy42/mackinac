@@ -294,15 +294,17 @@ def create_cobra_model(reference, id_type='modelseed', validate=False):
         model.id = model.id[1:]
 
     # Add compartments to the COBRApy model.
-    LOGGER.info('Started adding %d compartments from ModelSEED model', len(data['modelcompartments']))
+    LOGGER.info('Started adding %d compartments from source model', len(data['modelcompartments']))
+    compartments = dict()
     for index in range(len(data['modelcompartments'])):
-        modelseed_compartment = data['modelcompartments'][index]
-        cobra_id = convert_compartment_id(modelseed_compartment['id'], id_type)
-        model.compartments[cobra_id] = modelseed_compartment['label'][:-2]  # Strip _0 suffix from label
+        source_compartment = data['modelcompartments'][index]
+        cobra_id = convert_compartment_id(source_compartment['id'], id_type)
+        compartments[cobra_id] = source_compartment['label'][:-2]  # Strip _0 suffix from label
+    model.compartments = compartments
     LOGGER.info('Finished adding %d compartments to model', len(model.compartments))
 
     # Add all of the metabolites (or compounds) to the COBRApy model.
-    LOGGER.info('Started adding %d metabolites from ModelSEED model', len(data['modelcompounds']))
+    LOGGER.info('Started adding %d metabolites from source model', len(data['modelcompounds']))
     num_duplicates = 0
     metabolite_list = DictList()
     for index in range(len(data['modelcompounds'])):
@@ -336,7 +338,7 @@ def create_cobra_model(reference, id_type='modelseed', validate=False):
              .format(num_duplicates, model.id, model.name))
 
     # Add all of the reactions to the COBRApy model.
-    LOGGER.info('Started adding %d reactions from ModelSEED model', len(data['modelreactions']))
+    LOGGER.info('Started adding %d reactions from source model', len(data['modelreactions']))
     reaction_list = DictList()
     for index in range(len(data['modelreactions'])):
         reaction_list.append(_convert_reaction(data['modelreactions'][index], model, id_type, likelihoods))
