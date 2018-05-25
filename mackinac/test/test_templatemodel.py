@@ -4,6 +4,7 @@ from os.path import join, exists
 import mackinac
 
 
+@pytest.mark.usefixtures('download_data')
 class TestTemplateModel:
 
     def test_reconstruct_bacteria(self, universal_folder, bacteria_folder):

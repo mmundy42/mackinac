@@ -1,26 +1,24 @@
 Mackinac: A bridge between ModelSEED and COBRApy
 ================================================
 
-Mackinac combines the ability of `ModelSEED <http://modelseed.org>`_ to automatically
-reconstruct metabolic models with the advanced analysis capabilities in
-`cobrapy <https://github.com/opencobra/cobrapy>`_ to bridge the differences between
-the two frameworks. Mackinac provides support for using the ModelSEED
-web service to create draft genome-scale models from genomes available in the
-`Pathosystems Resource Integration Center <https://www.patricbrc.org/portal/portal/patric/Home>`_
-(PATRIC) and creates a COBRA model from a ModelSEED model. If you are not a
-`registered PATRIC user <http://enews.patricbrc.org/faqs/workspace-faqs/registration-faqs/>`_,
-you must complete a `new user registration <https://user.patricbrc.org/register/>`_
-to work with the ModelSEED web service.
- 
-If you already have models available in ModelSEED, you can simply import and
-create a COBRA model with the ``create_cobra_model_from_modelseed_model()``
-function. You can then use all of the features in cobrapy to analyze,
+Mackinac combines the automatic reconstruction of metabolic models using
+`ModelSEED <http://modelseed.org>`_ or the `Pathosystems Resource Integration Center
+<https://www.patricbrc.org/portal/portal/patric/Home>`_ (PATRIC) with the
+advanced analysis capabilities in `cobrapy <https://github.com/opencobra/cobrapy>`_
+to bridge the differences between the frameworks. Mackinac provides support for
+using the PATRIC and ModelSEED services to create draft genome-scale models from
+genomes available in PATRIC and creates a COBRA model from the draft model. If
+you already have models available in PATRIC or ModelSEED, you can simply import and
+create a COBRA model. You can then use all of the features in cobrapy to analyze,
 inspect, explore, and draw conclusions from the model.
 
-You can also reconstruct and gap fill models using the ModelSEED
-service for any organism with a genome available in PATRIC. Additional functions
-are available for working with ModelSEED models, managing workspace objects,
-getting information about PATRIC genomes, and calculating reaction likelihoods.
+If you are not a `registered PATRIC user <http://enews.patricbrc.org/faqs/workspace-faqs/registration-faqs/>`_,
+you must complete a `new user registration <https://user.patricbrc.org/register/>`_
+to work with the PATRIC or ModelSEED services.
+
+You can also work with your PATRIC or ModelSEED models, manage your PATRIC workspace,
+get information about PATRIC genomes, and create a draft model using likelihoods
+from a template model.
 
 Please use the `cobrapy Google
 Group <http://groups.google.com/group/cobra-pie>`_ for help.
@@ -44,76 +42,21 @@ inside a `virtual environment
 Web service URLs
 ----------------
 
-Mackinac uses web services provided by other organizations which can be offline,
-the interface can change, or the URL can change. Mackinac uses these default URLs:
+Mackinac uses services provided by other organizations which can be offline, the
+interface can change, or the URL can change. Mackinac uses these default URLs:
 
-* ModelSEED web service at http://p3c.theseed.org/dev1/services/ProbModelSEED
-* Workspace web service at https://p3.theseed.org/services/Workspace
-* PATRIC web service at https://www.patricbrc.org/api/
+* ModelSEED service at https://p3.theseed.org/services/ProbModelSEED
+* Workspace service at https://p3.theseed.org/services/Workspace
+* PATRIC API at https://www.patricbrc.org/api/
 * PATRIC app service at https://p3.theseed.org/services/app_service
 
-Alternate URLs include the following:
-
-* Former production ModelSEED web service at https://p3.theseed.org/services/ProbModelSEED
-
-You can change the URL used to connect to a web service as shown below:
+You can change the URL used to connect to a service as shown below:
 
     >>> import mackinac
-    >>> mackinac.modelseed.ms_client.url = 'http://p3c.theseed.org/dev1/services/ProbModelSEED'
+    >>> mackinac.modelseed.ms_client.url = 'http://p3.theseed.org/services/ProbModelSEED'
     >>> mackinac.workspace.ws_client.url = 'https://p3.theseed.org/services/Workspace'
     >>> mackinac.genome.patric_url = 'https://www.patricbrc.org/api/'
     >>> mackinac.patric.patric_app_url = 'https://p3.theseed.org/services/app_service'
-
-Direct installation in virtual environment
-------------------------------------------
-
-1. If virtualenvwrapper is not installed, `follow the directions <https://virtualenvwrapper.readthedocs.io/en/stable/>`__
-   to install virtualenvwrapper. You should also `update your shell startup file
-   <http://virtualenvwrapper.readthedocs.io/en/stable/install.html#shell-startup-file>`_.
-
-2. Clone the `git repository <https://github.com/mmundy42/mackinac>`_ to your
-   computer with this command::
-
-    $ git clone https://github.com/mmundy42/mackinac.git
-
-3. Create a virtualenv for Mackinac with these commands::
-
-    $ cd mackinac
-    $ mkvirtualenv mackinac
-
-   Use the ``--python`` option to select a specific version of Python for the
-   virtualenv. For example, ``python=python3`` to select the current python3
-   installed on the system.
-
-   Note on macOS, matplotlib requires Python be installed as a framework but
-   virtualenv creates a non-framework build of Python. See the
-   `matplotlib FAQ <http://matplotlib.org/1.5.3/faq/virtualenv_faq.html>`__
-   for details on a workaround.
-
-4. Upgrade pip and setuptools to the latest versions with these commands::
-
-    (mackinac)$ pip install --upgrade pip setuptools
-
-5. Install all of the Mackinac dependencies with this command::
-
-    (mackinac)$ pip install -r requirements.txt
-
-   This command can take a few minutes while numpy, pandas, and libsbml are
-   built in the virtualenv.
-
-6. Install the latest version of Mackinac with this command::
-
-    (mackinac)$ python setup.py install
-
-7. Install the pytest package with this command::
-
-    (mackinac)$ pip install pytest
-
-8. You need to provide a username and password for the tests to obtain an
-   authentication token. Substitute your PATRIC username and password and run
-   the tests with this command::
-
-    (mackinac)$ TEST_USERNAME=<username> TEST_PASSWORD=<password> pytest mackinac/test -v
 
 Run examples in a notebook
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -189,19 +132,19 @@ Release Notes
 Version 0.9.0 (January XX, 2018)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+* Added support for creating models using PATRIC app service
 * Added support for template models which includes reconstructing a draft model
   from the genome of an organism and exporting a template model to a cobra model,
   a PSAMM model, and a list file
 * Added support for calculating reaction likelihoods and reconstructing a draft
   model from the reaction likelihoods
 * Added support for gap filling a model using cobra gap fill method
-* Added support for creating models using PATRIC app service
-* Updates to work better with current cobra versions
+* Updates for compatibility with latest COBRApy versions
 * Changed documentation to Read the Docs format and configured build with Sphinx
-* Added documentation for configuring and running model reconstruction from a template
 * Fixed get_modelseed_gapfill_solutions() to convert ID type of reactions to match
   conversion done by create_cobra_model_from_modelseed_model()
 * Bug fixes and better logging
+* Switched default ModelSEED service URL to production server
 
 Version 0.8.4 (May 18, 2017)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^

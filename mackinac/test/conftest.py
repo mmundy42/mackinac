@@ -1,6 +1,6 @@
 import pytest
 import os
-from os.path import expanduser, join, abspath, dirname
+from os.path import expanduser, join, abspath, dirname, exists
 import mackinac
 
 
@@ -34,7 +34,11 @@ def authenticate():
 
 
 @pytest.fixture(scope='session')
-def download_data(data_folder, search_program_path):
+def download_data(data_folder, work_folder, search_program_path):
+    if not exists(data_folder):
+        os.makedirs(data_folder)
+    if not exists(work_folder):
+        os.makedirs(work_folder)
     fid_role_path = join(data_folder, 'otu_fid_role.tsv')
     protein_sequence_path = join(data_folder, 'protein.fasta')
     search_db_path = join(data_folder, 'protein.udb')
