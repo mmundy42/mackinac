@@ -25,7 +25,7 @@ Here's how to setup Mackinac for local development:
 
    Use the ``--python`` option to select a specific version of Python for the
    virtualenv. For example, to select the current python3 installed on the system
-   run this command:
+   run this command::
 
     $ mkvirtualenv --python=python3 mackinac
 
@@ -34,7 +34,7 @@ Here's how to setup Mackinac for local development:
    `matplotlib FAQ <http://matplotlib.org/1.5.3/faq/virtualenv_faq.html>`__
    for details on a workaround.
 
-4. Upgrade pip and setuptools to the latest versions with these command::
+4. Upgrade pip and setuptools to the latest versions with this command::
 
     (mackinac)$ pip install --upgrade pip setuptools
 
