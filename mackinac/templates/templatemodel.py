@@ -6,7 +6,10 @@ import re
 
 from cobra.core import Object, DictList, Model, Gene
 from cobra.io import save_json_model
-from psamm.importers.cobrajson import Importer
+try:
+    from psamm.importers.cobrajson import Importer
+except ImportError:
+    Importer = None
 
 from .util import read_source_file, create_boundary
 from .templatecompartment import create_template_compartment, compartment_fields
@@ -576,6 +579,8 @@ class TemplateModel(Object):
             Template model converted to a PSAMM native model
         """
 
+        if not Importer:
+            raise ImportError('to_psamm_model() method requires psamm Importer module')
         with NamedTemporaryFile() as cobra_json:
             save_json_model(self.to_cobra_model(), cobra_json)
             cobra_json.seek(0)

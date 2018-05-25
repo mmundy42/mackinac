@@ -1,17 +1,21 @@
 from setuptools import setup, find_packages
 
 requirements = [
-    'cobra>=0.5.4',
+    'cobra>=0.9.0',
     'six',
     'requests',
     'configparser',
-    'psamm>=0.31'
+    'jsonschema'
 ]
+
+extras = {
+    'psamm': ['psamm>=0.31']
+}
 
 try:
     with open('README.rst') as handle:
         description = handle.read()
-except:
+except IOError:
     description = ''
 
 setup(
@@ -21,6 +25,7 @@ setup(
     setup_requires=[],
     install_requires=requirements,
     tests_require=['pytest', 'numpy'],
+    extras_require=extras,
     package_data={'': ['data/modelseed/bacteria/*', 'data/modelseed/original/*', 'data/modelseed/universal/*']},
     author='Michael Mundy, Helena Mendes-Soares, Nicholas Chia',
     author_email='mundy.michael@mayo.edu',
