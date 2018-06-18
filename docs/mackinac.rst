@@ -35,6 +35,14 @@ mackinac\.likelihood module
     :undoc-members:
     :show-inheritance:
 
+mackinac\.logger module
+-----------------------
+
+.. automodule:: mackinac.logger
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
 mackinac\.modelseed module
 --------------------------
 
@@ -43,10 +51,18 @@ mackinac\.modelseed module
     :undoc-members:
     :show-inheritance:
 
-mackinac\.prevlikelihood module
--------------------------------
+mackinac\.modelutil module
+--------------------------
 
-.. automodule:: mackinac.prevlikelihood
+.. automodule:: mackinac.modelutil
+    :members:
+    :undoc-members:
+    :show-inheritance:
+
+mackinac\.patric module
+-----------------------
+
+.. automodule:: mackinac.patric
     :members:
     :undoc-members:
     :show-inheritance:

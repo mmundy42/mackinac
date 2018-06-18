@@ -12,14 +12,6 @@ mackinac\.templates\.feature module
     :undoc-members:
     :show-inheritance:
 
-mackinac\.templates\.template module
-------------------------------------
-
-.. automodule:: mackinac.templates.template
-    :members:
-    :undoc-members:
-    :show-inheritance:
-
 mackinac\.templates\.templatebiomass module
 -------------------------------------------
 
