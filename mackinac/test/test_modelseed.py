@@ -11,7 +11,7 @@ class TestModelseedBacteroidesThetaiotaomicron:
     # and how busy the server is servicing other requests.
 
     def test_reconstruct(self, b_theta_genome_id, b_theta_id, b_theta_name):
-        stats = mackinac.reconstruct_modelseed_model(b_theta_genome_id, model_id=b_theta_id)
+        stats = mackinac.reconstruct_modelseed_model(b_theta_genome_id, b_theta_id)
         assert stats['id'] == b_theta_id
         assert stats['name'] == b_theta_name
         assert stats['num_compartments'] == 2
@@ -130,7 +130,7 @@ class TestModelseedBacteroidesThetaiotaomicron:
 
     def test_bad_genome_id(self):
         with pytest.raises(ValueError):
-            mackinac.reconstruct_modelseed_model('900.900')
+            mackinac.reconstruct_modelseed_model('900.900', 'Badgenome')
 
     def test_bad_sort_key(self):
         with pytest.raises(KeyError):

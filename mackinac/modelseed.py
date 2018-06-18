@@ -193,13 +193,16 @@ def delete_modelseed_model(model_id):
     """
 
     reference = _make_modelseed_model_reference(model_id)
+    # error = None
     LOGGER.info('Started delete model using web service for "%s"', reference)
     try:
         ms_client.call('delete_model', {'model': reference})
     except ServerError as e:
         raise handle_server_error(e, [reference])
+        # error = handle_server_error(e, [reference])
     LOGGER.info('Finished delete model using web service for "%s"', reference)
 
+    # if error: raise error
     return
 
 
@@ -435,15 +438,15 @@ def optimize_modelseed_model(model_id, media_reference=None):
     return float(solutions[0]['objective'])
 
 
-def reconstruct_modelseed_model(genome_id, model_id=None, template_reference=None):
+def reconstruct_modelseed_model(genome_id, model_id, template_reference=None):
     """ Reconstruct a draft ModelSEED model for an organism.
 
     Parameters
     ----------
     genome_id : str
         Genome ID or workspace reference to genome
-    model_id : str, optional
-        ID of output model (default is "M" + genome ID)
+    model_id : str
+        ID of output model
     template_reference : str, optional
         Workspace reference to template model
 
@@ -460,8 +463,6 @@ def reconstruct_modelseed_model(genome_id, model_id=None, template_reference=Non
     params = dict()
     params['genome'] = 'PATRICSOLR:' + genome_id
     # params['fulldb'] = 0
-    if model_id is None:
-        model_id = 'M' + genome_id
     params['output_file'] = model_id
     if template_reference is not None:
         params['template_model'] = template_reference
