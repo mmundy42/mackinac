@@ -1,9 +1,11 @@
 
-Create a PATRIC model
----------------------
+Create a model using PATRIC service
+-----------------------------------
 
-Mackinac provides functions for creating a PATRIC model using the PATRIC
-web service and creating a COBRA model from the PATRIC model.
+Mackinac provides functions for creating a model using the PATRIC web
+service and creating a COBRA model from the PATRIC model. The COBRA
+model contains all of the information from the PATRIC model, including
+metabolite data and gene annotations.
 
 .. code:: ipython3
 

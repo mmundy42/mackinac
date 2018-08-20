@@ -1,11 +1,11 @@
 
-Create a ModelSEED model
-------------------------
+Create a model using ModelSEED service
+--------------------------------------
 
-Mackinac provides functions for creating a ModelSEED model using the
-ModelSEED web service and creating a COBRA model from the ModelSEED
-model. The COBRA model contains all of the information from the
-ModelSEED model, including metabolite data and gene annotations.
+Mackinac provides functions for creating a model using the ModelSEED web
+service and creating a COBRA model from the ModelSEED model. The COBRA
+model contains all of the information from the ModelSEED model,
+including metabolite data and gene annotations.
 
 .. code:: ipython3
 
