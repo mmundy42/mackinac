@@ -201,9 +201,9 @@ class TemplateModel(Object):
             if rxn.type == 'conditional':
                 try:
                     complexes = [all_complexes.get_by_id(complex_id) for complex_id in rxn.complex_ids]
-                except:
-                    raise TemplateError('Complex {0} referenced by reaction {1} was not found'
-                                        .format(complex_id, rxn.id))
+                except KeyError as e:
+                    LOGGER.error('Complex {0} referenced by reaction {1} was not found'.format(e.args[0], rxn.id))
+                    raise e
                 self.complexes.union(complexes)
                 for complx in complexes:
                     complx.reaction_ids.add(rxn.id)
@@ -229,9 +229,9 @@ class TemplateModel(Object):
         for complx in self.complexes:
             try:
                 roles = [all_roles.get_by_id(role['role_id']) for role in complx.roles]
-            except KeyError:
-                raise TemplateError('Role {0} referenced by complex {1} is not available'
-                                    .format(role['role_id'], complx.id))
+            except KeyError as e:
+                LOGGER.error('Role {0} referenced by complex {1} is not available'.format(e.args[0], complx.id))
+                raise e
             self.roles.union(roles)
             for role in roles:
                 role.complex_ids.add(complx.id)
@@ -484,8 +484,9 @@ class TemplateModel(Object):
         # Find the TemplateReaction objects for the specified IDs.
         try:
             reaction_list = [self.reactions.get_by_id(reaction_id) for reaction_id in reaction_id_list]
-        except KeyError:
-            raise TemplateError('Reaction {0} is not available in template'.format(reaction_id))
+        except KeyError as e:
+            LOGGER.error('Reaction {0} is not available in template'.format(e.args[0]))
+            raise e
 
         # Follow the path to roles and create output dictionary.
         output = dict()
@@ -519,8 +520,9 @@ class TemplateModel(Object):
         # Find the TemplateRole objects for the specified role IDs.
         try:
             role_list = [self.roles.get_by_id(role_id) for role_id in role_id_list]
-        except KeyError:
-            raise TemplateError('Role {0} is not available in template'.format(role_id))
+        except KeyError as e:
+            LOGGER.error('Role {0} is not available in template'.format(e.args[0]))
+            raise e
 
         # Follow the path to reactions and create output dictionary.
         output = dict()
@@ -582,6 +584,7 @@ class TemplateModel(Object):
         if not Importer:
             raise ImportError('to_psamm_model() method requires psamm Importer module')
         with NamedTemporaryFile() as cobra_json:
+            # TODO save_json_model() fails with TypeError exception
             save_json_model(self.to_cobra_model(), cobra_json)
             cobra_json.seek(0)
             model = Importer().import_model(cobra_json)
@@ -597,7 +600,7 @@ class TemplateModel(Object):
         list_file_name : str
             Path to output file with reaction list
         dictionary_file_name : str
-            Path to dictionary file that maps template metabolite IDs to model metabolite IDs
+            Path to output dictionary file that maps model metabolite IDs to template metabolite IDs
         """
 
         # All coefficients must be whole numbers.
