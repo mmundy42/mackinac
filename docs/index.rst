@@ -23,6 +23,7 @@ the effects of reaction or gene knockouts.
 
    configure
    genome
+   templates
    patric
    modelseed
    reconstruct
